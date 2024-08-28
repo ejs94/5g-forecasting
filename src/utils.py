@@ -1,8 +1,13 @@
 import glob
 import os
+from typing import List
+
 import numpy as np
 import pandas as pd
 import shortuuid
+from darts import TimeSeries
+from darts.dataprocessing import Pipeline
+from darts.dataprocessing.transformers import MissingValuesFiller, Scaler
 
 
 def extract_5G_dataset(path: os.path) -> list[pd.DataFrame]:
@@ -107,3 +112,60 @@ def compact_5G_dataset(df: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
     )
     return compact_df
+
+
+def preprocess_list_ts(list_ts: List[TimeSeries]) -> List[TimeSeries]:
+    """
+    Preprocessa uma lista de séries temporais aplicando preenchimento de valores faltantes e escalonamento.
+
+    Esta função recebe uma lista de séries temporais (`list_ts`) e aplica uma
+    sequência de transformações a cada série. As transformações incluem:
+    - Preenchimento de valores faltantes utilizando `MissingValuesFiller`.
+    - Escalonamento dos dados utilizando `Scaler`.
+
+    As transformações são aplicadas usando um `Pipeline` que encapsula
+    as operações. A função retorna uma nova lista com as séries temporais transformadas.
+
+    Args:
+        list_ts (List[TimeSeries]): Lista de séries temporais a serem transformadas.
+
+    Returns:
+        List[TimeSeries]: Lista de séries temporais após a aplicação das transformações.
+    """
+
+    list_transformed = []
+
+    filler = MissingValuesFiller()
+    scaler = Scaler()
+
+    pipe = Pipeline([filler, scaler])
+
+    for ts in list_ts:
+        transformed = pipe.fit_transform(ts)
+        list_transformed.append(transformed)
+
+    return list_transformed
+
+
+def convert_dfs_to_ts(
+    list_df: List[pd.DataFrame], target_columns: List[str]
+) -> List[TimeSeries]:
+    """
+    Converte uma lista de DataFrames em uma lista de séries temporais (`TimeSeries`).
+
+    Esta função recebe uma lista de DataFrames (`list_df`) e converte cada DataFrame
+    em uma série temporal (`TimeSeries`) utilizando as colunas especificadas em `target_columns`.
+
+    Args:
+        list_df (List[pd.DataFrame]): Lista de DataFrames a serem convertidos.
+        target_columns (List[str]): Lista de nomes das colunas que contêm os valores das séries temporais.
+
+    Returns:
+        List[TimeSeries]: Lista de objetos `TimeSeries` resultantes da conversão.
+    """
+
+    for i, df in enumerate(list_df):
+        # Converter o DataFrame para TimeSeries usando as colunas especificadas
+        list_df[i] = TimeSeries.from_dataframe(df, value_cols=target_columns)
+
+    return list_df

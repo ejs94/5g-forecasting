@@ -1,12 +1,9 @@
 from itertools import cycle
 
 import plotly.express as px
-
-
 import plotly.graph_objects as go
 import plotly.io as pio
 from plotly.subplots import make_subplots
-
 
 pio.templates.default = "plotly_white"
 

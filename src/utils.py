@@ -1,6 +1,6 @@
 import glob
 import os
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -114,37 +114,63 @@ def compact_5G_dataset(df: pd.DataFrame) -> pd.DataFrame:
     return compact_df
 
 
-def preprocess_list_ts(list_ts: List[TimeSeries]) -> List[TimeSeries]:
+def separate_by_uid_and_frequency(
+    df: pd.DataFrame, target_columns: list, frequency: str
+) -> list:
     """
-    Preprocessa uma lista de séries temporais aplicando preenchimento de valores faltantes e escalonamento.
+    Separa o DataFrame com base nas colunas específicas e no 'Uid', retornando uma lista de DataFrames filtrados.
+    A frequência temporal é obrigatória para ajustar os dados.
 
-    Esta função recebe uma lista de séries temporais (`list_ts`) e aplica uma
-    sequência de transformações a cada série. As transformações incluem:
-    - Preenchimento de valores faltantes utilizando `MissingValuesFiller`.
-    - Escalonamento dos dados utilizando `Scaler`.
+    Args:
+        df (pd.DataFrame): DataFrame original contendo a coluna 'Uid'.
+        target_columns (list): Lista de colunas a serem extraídas para cada Uid.
+        frequency (str): Frequência temporal para ajustar os dados (obrigatório).
 
-    As transformações são aplicadas usando um `Pipeline` que encapsula
-    as operações. A função retorna uma nova lista com as séries temporais transformadas.
+    Returns:
+        list: Lista de DataFrames, um para cada Uid, contendo as colunas especificadas.
+    """
+    separated_dfs = []
+
+    # Obtém a lista única de Uids e ordena
+    unique_uids = sorted(df["Uid"].unique())
+
+    # Itera sobre cada Uid e filtra os dados
+    for uid in unique_uids:
+        filtered_df = df[df["Uid"] == uid][target_columns].asfreq(freq=frequency)
+        separated_dfs.append(filtered_df)
+
+    return separated_dfs
+
+
+def preprocess_list_ts(
+    list_ts: List[TimeSeries],
+) -> Tuple[List[TimeSeries], List[Scaler]]:
+    """
+    Preprocessa uma lista de séries temporais aplicando preenchimento de valores faltantes e escalonamento,
+    e retorna a lista de séries transformadas junto com os escalonadores usados para cada série.
 
     Args:
         list_ts (List[TimeSeries]): Lista de séries temporais a serem transformadas.
 
     Returns:
-        List[TimeSeries]: Lista de séries temporais após a aplicação das transformações.
+        Tuple[List[TimeSeries], List[Scaler]]: Lista de séries temporais transformadas e seus respectivos escalonadores.
     """
 
     list_transformed = []
+    scalers = []
 
     filler = MissingValuesFiller()
-    scaler = Scaler()
-
-    pipe = Pipeline([filler, scaler])
 
     for ts in list_ts:
+        # Escalonador independente para cada série temporal
+        scaler = Scaler()
+        pipe = Pipeline([filler, scaler])
+
         transformed = pipe.fit_transform(ts)
         list_transformed.append(transformed)
+        scalers.append(scaler)
 
-    return list_transformed
+    return list_transformed, scalers
 
 
 def convert_dfs_to_ts(

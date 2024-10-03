@@ -1,0 +1,34 @@
+version: '3'
+services:
+  darts-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    container_name: darts_cpu_container
+    volumes:
+      - ./src:/app
+    command: python3 main.py
+
+  darts-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    container_name: darts_gpu_container
+    runtime: nvidia  # Ativa o suporte a GPU sem precisar de deploy.resources
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all  # Configura a visibilidade de todas as GPUs
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ./src:/app
+    command: python3 main.py
+
+  # test:
+  #   image: nvidia/cuda:12.5.0-runtime-ubuntu22.04
+  #   command: nvidia-smi
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]

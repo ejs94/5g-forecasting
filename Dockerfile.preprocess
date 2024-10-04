@@ -1,0 +1,18 @@
+# Use a base image with Python
+FROM python:3.10-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Install dependencies (add required packages for preprocessing)
+COPY requirements.preprocess.txt /app/
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.preprocess.txt
+
+# Copy datasets to preprocess
+COPY ./datasets /app/datasets
+
+# Copy preprocessing script
+COPY ./src /app
+
+# Command to run the preprocessing script
+CMD ["python3", "prepare_dataset.py"]

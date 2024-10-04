@@ -25,4 +25,4 @@ RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.cpu.
 COPY ./src /app
 
 # Define o comando padrão ao iniciar o contêiner
-CMD ["python3", "main.py"]
+CMD ["python3", "train_univariate.py"]

@@ -1,13 +1,22 @@
-version: '3'
 services:
+  preprocess:
+    build:
+      context: .
+      dockerfile: Dockerfile.preprocess
+    volumes:
+      - ./data:/app/data  # Mount shared volume for the dataset
+    command: python3 prepare_dataset.py  # Runs preprocessing and stops
+  
+  
   darts-cpu:
     build:
       context: .
       dockerfile: Dockerfile.cpu
     container_name: darts_cpu_container
     volumes:
+      - ./data:/app/data
       - ./src:/app
-    command: python3 main.py
+    command: python3 train_univariate.py
 
   darts-gpu:
     build:

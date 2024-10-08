@@ -4,3 +4,5 @@ torchvision
 torchaudio
 numpy
 pandas
+shortuuid
+prophet

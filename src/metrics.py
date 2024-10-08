@@ -1,5 +1,6 @@
 import time
 from typing import Any, Dict, List, Optional, Tuple
+import os
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -227,6 +228,55 @@ def sliding_window_cross_validate_and_evaluate(
     return results
 
 
+def collect_univariate_metrics(list_series, target_columns, model_name, model, output_file, K=5, H=1):
+    """
+    Coleta e salva métricas univariadas para uma lista de séries temporais utilizando
+    um modelo de previsão. Os resultados são salvos em formato Parquet.
+
+    Args:
+        list_series (list): Lista de séries temporais, cada uma contendo colunas de KPIs.
+        target_columns (list): Lista de colunas (KPIs) que serão avaliadas nas séries.
+        model_name (str): Nome do modelo de previsão.
+        model: Modelo de previsão a ser utilizado.
+        output_file (str): Nome do arquivo de saída (formato .parquet).
+        K (int): Número de subconjuntos para validação cruzada. Padrão: 5.
+        H (int): Horizonte de previsão. Padrão: 1.
+
+    Returns:
+        pd.DataFrame: DataFrame contendo os resultados das métricas para cada série e KPI.
+    """
+
+    # Define o caminho para salvar o arquivo, adicionando a extensão .parquet
+    output_path = os.path.join(os.curdir, "data", "results", f"{output_file}.parquet")
+    
+    # Cria o diretório se não existir
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    result_records = []
+
+    # Itera sobre cada série temporal
+    for i, series in enumerate(list_series):
+        for kpi in target_columns:
+            try:
+                # Avalia e coleta os resultados para o KPI
+                results = sliding_window_cross_validate_and_evaluate(
+                    model, series[kpi], K, H, 60, model_name
+                )
+                results["target"] = kpi
+                result_records.append(results)
+            except Exception as e:
+                print(f"Erro ao processar a série {i} com {kpi}: {e}")
+                continue
+    
+    result_record = pd.DataFrame(result_records)
+    
+    # Salva o DataFrame em formato Parquet
+    result_record.to_parquet(output_path, compression="gzip")
+
+    print(f"Saved in {output_path}")
+    return result_record
+
+
 def compare_series_metrics(
     results: pd.DataFrame, default_freq: str = "S"
 ) -> pd.DataFrame:
@@ -245,6 +295,12 @@ def compare_series_metrics(
         pd.DataFrame: DataFrame com as métricas calculadas adicionadas como novas
         colunas ("MAE", "RMSE", "MSE").
     """
+    # Verifica se 'results' é None ou não é um DataFrame
+    if results is None:
+        raise ValueError("O parâmetro 'results' não pode ser None.")
+    if not isinstance(results, pd.DataFrame):
+        raise TypeError("O parâmetro 'results' deve ser um DataFrame.")
+
 
     def validate_row(row):
         """

@@ -9,6 +9,8 @@ from darts import TimeSeries
 from darts.dataprocessing import Pipeline
 from darts.dataprocessing.transformers import MissingValuesFiller, Scaler
 
+from metrics import collect_univariate_metrics, compare_series_metrics, calculate_grouped_statistics
+
 
 def extract_5G_dataset(path: os.path) -> list[pd.DataFrame]:
 
@@ -195,3 +197,58 @@ def convert_dfs_to_ts(
         list_df[i] = TimeSeries.from_dataframe(df, value_cols=target_columns)
 
     return list_df
+
+
+def training_model_for_activity(
+    activity: str,
+    model_name: str,
+    model,
+    list_series,
+    target_columns,
+    output_file: str,
+    K: int,
+    H: int
+) -> pd.DataFrame:
+    """
+    Treina um modelo univariado para uma atividade específica e retorna as estatísticas agrupadas.
+
+    Args:
+        activity (str): Nome da atividade a ser avaliada.
+        model_name (str): Nome do modelo a ser utilizado.
+        model: O modelo de previsão a ser aplicado.
+        list_series (list): Lista de séries temporais para a atividade.
+        target_columns (list): Colunas de KPI a serem avaliadas.
+        output_file (str): Nome do arquivo de saída (formato .gzip).
+        K (int): Número de subconjuntos para validação cruzada.
+        H (int): Horizonte de previsão.
+
+    Returns:
+        pd.DataFrame: DataFrame contendo estatísticas agrupadas para a atividade ou um DataFrame vazio em caso de erro.
+    """
+    
+    print(f"---{model_name} Forecast---")
+    
+    try:
+        # Coleta métricas univariadas
+        result = collect_univariate_metrics(
+            list_series, target_columns, model_name, model, output_file, K, H
+        )
+        
+        if result is None:
+            print(f"Warning: Result for {activity} using {model_name} is None.")
+            return pd.DataFrame()  # Retorna um DataFrame vazio em caso de None
+
+        # Compara as métricas
+        metrics = compare_series_metrics(result)
+
+        # Calcula estatísticas agrupadas
+        stats = calculate_grouped_statistics(metrics)
+
+        # Adiciona a atividade ao DataFrame de estatísticas
+        stats["Activity"] = activity
+        
+        return stats
+
+    except Exception as e:
+        print(f"Erro ao processar a atividade '{activity}' com o modelo '{model_name}': {e}")
+        return pd.DataFrame()  # Retorna um DataFrame vazio em caso de exceção

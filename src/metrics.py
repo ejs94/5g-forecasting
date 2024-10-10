@@ -260,7 +260,7 @@ def collect_univariate_metrics(list_series, target_columns, model_name, model, o
             try:
                 # Avalia e coleta os resultados para o KPI
                 results = sliding_window_cross_validate_and_evaluate(
-                    model, series[kpi], K, H, 60, model_name
+                    model, series[kpi], K, H, H, model_name
                 )
                 results["target"] = kpi
                 result_records.append(results)

@@ -47,8 +47,8 @@ print(config)
 
 print("---Carregando os dados preprocessados---")
 data_path = os.path.join(os.curdir, "data")
-df_static = pd.read_parquet(os.path.join(data_path, "5G_df_static.parquet.gzip"))
-df_driving = pd.read_parquet(os.path.join(data_path, "5G_df_driving.parquet.gzip"))
+df_static = pd.read_parquet(os.path.join(data_path, "5G_df_static.parquet"))
+df_driving = pd.read_parquet(os.path.join(data_path, "5G_df_driving.parquet"))
 
 print("---Separando os conjuntos em: Streaming vs. Downloading---")
 list_static_strm = df_static.query("User_Activity == 'Streaming Video'")

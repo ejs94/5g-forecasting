@@ -86,27 +86,28 @@ activities = {
 
 print("---Iniciando os treinamentos---")
 all_stats = []
+all_metrics = []
 
 print("---Configurando os modelos---")
 # Mapeamento dos modelos
 models = {
     "Naive": NaiveSeasonal(K=1),
     "NaiveDrift": NaiveDrift(),
-    "NaiveMovingAverage": NaiveMovingAverage(input_chunk_length=config["K"]),
-    "NaiveMean": NaiveMean(),
-    "ExponentialSmoothing": ExponentialSmoothing(),
-    "LinearRegression": LinearRegressionModel(lags=1),
-    "AutoARIMA": AutoARIMA(
-        start_p=0,
-        start_q=0,
-        max_order=4,
-        test="adf",
-        error_action="ignore",
-        suppress_warnings=True,
-    ),
-    "Theta": Theta(theta=1.0),
-    "FFT": FFT(),
-    "Prophet": Prophet(),
+    # "NaiveMovingAverage": NaiveMovingAverage(input_chunk_length=config["K"]),
+    # "NaiveMean": NaiveMean(),
+    # "ExponentialSmoothing": ExponentialSmoothing(),
+    # "LinearRegression": LinearRegressionModel(lags=1),
+    # "AutoARIMA": AutoARIMA(
+    #     start_p=0,
+    #     start_q=0,
+    #     max_order=4,
+    #     test="adf",
+    #     error_action="ignore",
+    #     suppress_warnings=True,
+    # ),
+    # "Theta": Theta(theta=1.0),
+    # "FFT": FFT(),
+    # "Prophet": Prophet(),
 }
 
 for model_name, model in models.items():
@@ -119,7 +120,7 @@ for model_name, model in models.items():
         output_file = f"uni_{model_name}_{activity}"
 
         # Treinamento do modelo para a atividade
-        stats = training_model_for_activity(
+        stats, metrics = training_model_for_activity(
             activity,
             model_name,
             model,
@@ -131,21 +132,30 @@ for model_name, model in models.items():
         )
 
         # Adiciona as estatísticas da atividade à lista geral
+        all_metrics.append(metrics)
         all_stats.append(stats)
 
 print("---Salvando métricas gerais de todos os modelos treinados---")
 # Define o caminho para salvar o arquivo de resultados
+output_all_metrics_path = os.path.join(
+    os.curdir, "data", "metrics_univariate.parquet"
+)
+
 output_all_stats_path = os.path.join(
-    os.curdir, "data", "results", "uni_all_stats.parquet"
+    os.curdir, "data", "stats_univariate.parquet"
 )
 
 # Cria o diretório se não existir
-os.makedirs(os.path.dirname(output_all_stats_path), exist_ok=True)
+os.makedirs(os.path.dirname(output_all_metrics_path), exist_ok=True)
+# Concatena todos os DataFrames e realiza o processamento
+all_metrics_df = pd.concat(all_metrics).reset_index()
+all_metrics_df.to_parquet(output_all_metrics_path, compression="gzip")
 
+# Cria o diretório se não existir
+os.makedirs(os.path.dirname(output_all_stats_path), exist_ok=True)
 # Concatena todos os DataFrames e realiza o processamento
 all_stats_df = pd.concat(all_stats).reset_index()
 all_stats_df.set_index(["Model", "target", "Activity"], inplace=True)
-
 # Salva o DataFrame resultante em um arquivo Parquet
 all_stats_df.to_parquet(output_all_stats_path, compression="gzip")
 

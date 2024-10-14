@@ -231,7 +231,7 @@ def training_model_for_activity(
     try:
         # Coleta métricas univariadas
         result = collect_univariate_metrics(
-            list_series, target_columns, model_name, model, output_file, K, H
+            activity, list_series, target_columns, model_name, model, output_file, K, H
         )
         
         if result is None:
@@ -247,7 +247,7 @@ def training_model_for_activity(
         # Adiciona a atividade ao DataFrame de estatísticas
         stats["Activity"] = activity
         
-        return stats
+        return stats, metrics
 
     except Exception as e:
         print(f"Erro ao processar a atividade '{activity}' com o modelo '{model_name}': {e}")

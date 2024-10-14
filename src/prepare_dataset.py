@@ -18,6 +18,7 @@ df_driving = preprocess_5G_dataframe(df_driving)
 print("---Salvando o 5G Dataset Processado---")
 
 print(df_static.info())
+
 save_path = os.path.join(os.curdir, "data", "5G_df_static.parquet")
 df_static.to_parquet(save_path, compression="gzip")
 

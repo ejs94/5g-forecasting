@@ -131,7 +131,7 @@ def sliding_window_cross_validate_and_evaluate(
     return results
 
 
-def collect_univariate_metrics(list_series, target_columns, model_name, model, output_file, K=5, H=1):
+def collect_univariate_metrics(activity, list_series, target_columns, model_name, model, output_file, K=5, H=1):
     """
     Coleta e salva métricas univariadas para uma lista de séries temporais utilizando
     um modelo de previsão. Os resultados são salvos em formato Parquet.
@@ -166,6 +166,7 @@ def collect_univariate_metrics(list_series, target_columns, model_name, model, o
                     model, series[kpi], K, H, H, model_name
                 )
                 results["target"] = kpi
+                results["Activity"] = activity
                 result_records.append(results)
             except Exception as e:
                 print(f"Erro ao processar a série {i} com {kpi}: {e}")

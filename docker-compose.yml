@@ -3,10 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.preprocess
+    container_name: preprocess_datasets
     volumes:
       - ./data:/app/data  # Mount shared volume for the dataset
     command: python3 prepare_dataset.py  # Runs preprocessing and stops
-  
   
   darts-cpu:
     build:
@@ -31,6 +31,22 @@ services:
       - ./data:/app/data
       - ./src:/app
     command: python3 train_multivariate.py
+  
+  jupyterlab:
+    build:
+      context: .
+      dockerfile: Dockerfile.jupyterlab
+    container_name: jupyterlab_container
+    ports:
+      - "8888:8888"  # Porta para acesso externo
+    volumes:
+      - ./data:/home/jovyan/data
+      - ./notebooks:/home/jovyan/work
+      - ./src:/home/jovyan/work/src
+    environment:
+      - NB_UID=1000  # UID do usuário jovyan
+      - NB_GID=100   # GID do grupo jovyan
+    command: start-notebook.sh --NotebookApp.token='MeuProjeto2024@' --NotebookApp.ip='0.0.0.0' --NotebookApp.allow_remote_access=True
 
   # test:
   #   image: nvidia/cuda:12.5.0-runtime-ubuntu22.04

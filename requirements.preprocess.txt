@@ -1,4 +1,6 @@
-pandas
 numpy
-shortuuid
+pandas
+matplotlib
+seaborn
 darts
+shortuuid

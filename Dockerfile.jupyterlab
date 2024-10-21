@@ -1,2 +1,9 @@
 FROM quay.io/jupyter/base-notebook
-RUN pip install --no-cache-dir matplotlib seaborn darts
+
+# Install dependencies (add required packages for preprocessing)
+COPY requirements.preprocess.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.preprocess.txt && \
+    rm requirements.preprocess.txt
+
+RUN mkdir -p /home/jovyan/work/data && chmod -R 770 /home/jovyan/work/data

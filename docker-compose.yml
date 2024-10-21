@@ -40,13 +40,14 @@ services:
     ports:
       - "8888:8888"  # Porta para acesso externo
     volumes:
-      - ./data:/home/jovyan/data
+      - ./data:/home/jovyan/work/data
       - ./notebooks:/home/jovyan/work
       - ./src:/home/jovyan/work/src
     environment:
       - NB_UID=1000  # UID do usuário jovyan
       - NB_GID=100   # GID do grupo jovyan
-    command: start-notebook.sh --NotebookApp.token='MeuProjeto2024@' --NotebookApp.ip='0.0.0.0' --NotebookApp.allow_remote_access=True
+      - NOTES_DIR=/home/jovyan/work  # Define o diretório de trabalho padrão
+    command:  start-notebook.py --IdentityProvider.token='MeuProjeto2024@' --ServerApp.ip='0.0.0.0' --ServerApp.allow_remote_access=True --ServerApp.root_dir='/home/jovyan/work'
 
   # test:
   #   image: nvidia/cuda:12.5.0-runtime-ubuntu22.04

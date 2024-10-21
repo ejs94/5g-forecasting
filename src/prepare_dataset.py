@@ -22,9 +22,8 @@ print(df_static.info())
 save_path = os.path.join(os.curdir, "data", "5G_df_static.parquet")
 df_static.to_parquet(save_path, compression="gzip")
 
-
 print(df_driving.info())
 save_path = os.path.join(os.curdir, "data", "5G_df_driving.parquet")
 df_driving.to_parquet(save_path, compression="gzip")
 
-print("---Finalizado---")
+print(f"---Finalizado---")

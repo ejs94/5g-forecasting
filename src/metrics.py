@@ -131,7 +131,7 @@ def sliding_window_cross_validate_and_evaluate(
     return results
 
 
-def collect_univariate_metrics(activity, list_series, target_columns, model_name, model, output_file, K=5, H=1):
+def collect_univariate_metrics(activity, list_series, target_columns, model_name, model, K=5, H=1):
     """
     Coleta e salva métricas univariadas para uma lista de séries temporais utilizando
     um modelo de previsão. Os resultados são salvos em formato Parquet.
@@ -148,12 +148,6 @@ def collect_univariate_metrics(activity, list_series, target_columns, model_name
     Returns:
         pd.DataFrame: DataFrame contendo os resultados das métricas para cada série e KPI.
     """
-
-    # Define o caminho para salvar o arquivo, adicionando a extensão .parquet
-    output_path = os.path.join(os.curdir, "data", "results", f"{output_file}.parquet")
-    
-    # Cria o diretório se não existir
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     result_records = []
 
@@ -171,14 +165,8 @@ def collect_univariate_metrics(activity, list_series, target_columns, model_name
             except Exception as e:
                 print(f"Erro ao processar a série {i} com {kpi}: {e}")
                 continue
-    
-    result_record = pd.DataFrame(result_records)
-    
-    # Salva o DataFrame em formato Parquet
-    result_record.to_parquet(output_path, compression="gzip")
 
-    print(f"Saved in {output_path}")
-    return result_record
+    return result_records
 
 
 def compare_series_metrics(

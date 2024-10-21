@@ -208,47 +208,50 @@ def training_model_for_activity(
     output_file: str,
     K: int,
     H: int
-) -> pd.DataFrame:
+) -> bool:
     """
-    Treina um modelo univariado para uma atividade específica e retorna as estatísticas agrupadas.
+    Trains a univariate model for a specific activity and indicates whether the operation was successful.
 
     Args:
-        activity (str): Nome da atividade a ser avaliada.
-        model_name (str): Nome do modelo a ser utilizado.
-        model: O modelo de previsão a ser aplicado.
-        list_series (list): Lista de séries temporais para a atividade.
-        target_columns (list): Colunas de KPI a serem avaliadas.
-        output_file (str): Nome do arquivo de saída (formato .gzip).
-        K (int): Número de subconjuntos para validação cruzada.
-        H (int): Horizonte de previsão.
+        activity (str): Name of the activity to be evaluated.
+        model_name (str): Name of the model to be used.
+        model: The forecasting model to be applied.
+        list_series (list): List of time series for the activity.
+        target_columns (list): KPI columns to be evaluated.
+        output_file (str): Name of the output file (without extension).
+        K (int): Number of subsets for cross-validation.
+        H (int): Forecast horizon.
 
     Returns:
-        pd.DataFrame: DataFrame contendo estatísticas agrupadas para a atividade ou um DataFrame vazio em caso de erro.
+        bool: True if the operation was successful, False otherwise.
     """
     
     print(f"---{model_name} Forecast---")
     
     try:
-        # Coleta métricas univariadas
+        # Collect univariate metrics
         result = collect_univariate_metrics(
-            activity, list_series, target_columns, model_name, model, output_file, K, H
+            activity, list_series, target_columns, model_name, model, K, H
         )
-        
+
         if result is None:
             print(f"Warning: Result for {activity} using {model_name} is None.")
-            return pd.DataFrame()  # Retorna um DataFrame vazio em caso de None
-
-        # Compara as métricas
-        metrics = compare_series_metrics(result)
-
-        # Calcula estatísticas agrupadas
-        stats = calculate_grouped_statistics(metrics)
-
-        # Adiciona a atividade ao DataFrame de estatísticas
-        stats["Activity"] = activity
+            return False  # Indicate failure if result is None
         
-        return stats, metrics
+        # Define the path to save the file, adding the .parquet extension
+        output_path = os.path.join(os.curdir, "data", "results", f"{output_file}.parquet")
+
+        # Create the directory if it doesn't exist
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Save the DataFrame in Parquet format
+        result_record = pd.DataFrame(result)
+        result_record.to_parquet(output_path, compression="gzip")
+
+        print(f"Saved in {output_path}")
+
+        return True  # Indicate success
 
     except Exception as e:
-        print(f"Erro ao processar a atividade '{activity}' com o modelo '{model_name}': {e}")
-        return pd.DataFrame()  # Retorna um DataFrame vazio em caso de exceção
+        print(f"Error processing activity '{activity}' with model '{model_name}': {e}")
+        return False  # Indicate failure in case of an exception

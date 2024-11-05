@@ -34,17 +34,17 @@ def process_results_parquet(folder: str) -> pd.DataFrame:
 
 def aggregate_median_metrics(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Função para calcular a mediana de MAE, RMSE e MSE, agrupando por Model, target e Activity.
+    Função para calcular a mediana de MAE, RMSE, MSE, NRMSE e NMSE, agrupando por Model, target e Activity.
 
     Parâmetros:
-    df (pd.DataFrame): DataFrame contendo os dados com as colunas 'Model', 'target', 'Activity', 'MAE', 'RMSE', 'MSE'.
+    df (pd.DataFrame): DataFrame contendo os dados com as colunas 'Model', 'target', 'Activity', 'MAE', 'RMSE', 'MSE', 'NRMSE', 'NMSE'.
 
     Retorna:
-    pd.DataFrame: DataFrame agregado contendo as medianas das métricas MAE, RMSE e MSE por Model, target e Activity.
+    pd.DataFrame: DataFrame agregado contendo as medianas das métricas MAE, RMSE, MSE, NRMSE e NMSE por Model, target e Activity.
     """
     
     # Verificar se as colunas necessárias estão presentes no DataFrame
-    required_columns = ['Model', 'target', 'Activity', 'MAE', 'RMSE', 'MSE']
+    required_columns = ['Model', 'target', 'Activity', 'MAE', 'RMSE', 'MSE', 'NRMSE', 'NMSE']
     for col in required_columns:
         if col not in df.columns:
             raise ValueError(f"Coluna {col} está ausente no DataFrame")
@@ -53,14 +53,18 @@ def aggregate_median_metrics(df: pd.DataFrame) -> pd.DataFrame:
     aggregated_df = df.groupby(['Model', 'target', 'Activity'], as_index=False).agg({
         'MAE': 'median',
         'RMSE': 'median',
-        'MSE': 'median'
+        'MSE': 'median',
+        'NRMSE': 'median',
+        'NMSE': 'median'
     })
     
     # Renomear as colunas agregadas para refletir que são medianas
     aggregated_df.rename(columns={
         'MAE': 'MAE_Median',
         'RMSE': 'RMSE_Median',
-        'MSE': 'MSE_Median'
+        'MSE': 'MSE_Median',
+        'NRMSE': 'NRMSE_Median',
+        'NMSE': 'NMSE_Median'
     }, inplace=True)
     
     return aggregated_df
@@ -68,19 +72,20 @@ def aggregate_median_metrics(df: pd.DataFrame) -> pd.DataFrame:
 
 def plot_bar_for_medians_by_target(df: pd.DataFrame) -> None:
     """
-    Generates bar plots for the metrics MAE_Median, RMSE_Median, and MSE_Median, separated by each unique target in the DataFrame.
+    Generates bar plots for the metrics MAE_Median, RMSE_Median, MSE_Median, NRMSE_Median, and NMSE_Median,
+    separated by each unique target in the DataFrame, with bars ordered from lowest to highest value.
 
     Parameters:
     df (pd.DataFrame): The DataFrame that contains the data for the bar plots.
 
     Returns:
-    None: Displays the bar plots for MAE_Median, RMSE_Median, and MSE_Median for each unique target.
+    None: Displays the bar plots for MAE_Median, RMSE_Median, MSE_Median, NRMSE_Median, and NMSE_Median for each unique target.
     """
     # Obtaining unique targets
     targets = df['target'].unique()
     
     # List of metrics to be plotted
-    metrics = ['MAE_Median', 'RMSE_Median', 'MSE_Median']
+    metrics = ['MAE_Median', 'RMSE_Median', 'MSE_Median', 'NRMSE_Median', 'NMSE_Median']
     
     # Define the desired order of activities
     activity_order = ['static_down', 'static_strm', 'driving_down', 'driving_strm']
@@ -92,9 +97,12 @@ def plot_bar_for_medians_by_target(df: pd.DataFrame) -> None:
         
         # Iterate over each metric
         for metric in metrics:
+            # Sorting target data by the metric in ascending order
+            target_data_sorted = target_data.sort_values(by=metric, ascending=True)
+            
             # Plotting the bar plot for the specific target and metric
             plt.figure(figsize=(10, 6))
-            sns.barplot(data=target_data, x='Activity', y=metric, hue='Model', order=activity_order)
+            sns.barplot(data=target_data_sorted, x='Activity', y=metric, hue='Model', order=activity_order)
             
             # Adjusting title and axis labels
             plt.title(f'Bar Plot of {metric} for target: {target}')
@@ -107,12 +115,14 @@ def plot_bar_for_medians_by_target(df: pd.DataFrame) -> None:
             plt.show()
 
 
-def plot_boxplots_for_metrics_by_target(data: pd.DataFrame) -> None:
+def plot_boxplots_for_metrics_by_target(data: pd.DataFrame, show_outliers: bool = True) -> None:
     """
-    Function to generate boxplots of MAE, RMSE, and MSE grouped by 'Model', 'target', and 'Activity'.
+    Function to generate boxplots of MAE, RMSE, MSE, NRMSE, and NMSE grouped by 'Model', 'target', and 'Activity',
+    with an option to display or hide outliers.
 
     Parameters:
-    data (pd.DataFrame): DataFrame containing the data with columns 'Model', 'target', 'Activity', 'MAE', 'RMSE', 'MSE'.
+    data (pd.DataFrame): DataFrame containing the data with columns 'Model', 'target', 'Activity', 'MAE', 'RMSE', 'MSE', 'NRMSE', 'NMSE'.
+    show_outliers (bool): If True, outliers will be displayed. If False, they will be hidden. Default is True.
 
     Returns:
     None: Displays the boxplot graphs.
@@ -133,27 +143,39 @@ def plot_boxplots_for_metrics_by_target(data: pd.DataFrame) -> None:
         # Filter the data for the current target
         data_subset = data[data['target'] == target]
 
-        # Create subplots for MAE, RMSE, and MSE
-        fig, axes = plt.subplots(3, 1, figsize=(15, 20))
+        # Create subplots for MAE, RMSE, MSE, NRMSE, and NMSE
+        fig, axes = plt.subplots(5, 1, figsize=(15, 28))
         fig.suptitle(f'Boxplots for {target}', fontsize=16)
 
         # Plot MAE metrics
-        sns.boxplot(data=data_subset, x='Activity', y='MAE', hue='Model', ax=axes[0], order=activity_order)
+        sns.boxplot(data=data_subset, x='Activity', y='MAE', hue='Model', ax=axes[0], order=activity_order, showfliers=show_outliers)
         axes[0].set_title(f'Boxplot of MAE for {target}')
         axes[0].set_ylabel('MAE')
         axes[0].legend(title='Model', bbox_to_anchor=(1.05, 1), loc='upper left')
 
         # Plot RMSE metrics
-        sns.boxplot(data=data_subset, x='Activity', y='RMSE', hue='Model', ax=axes[1], order=activity_order)
+        sns.boxplot(data=data_subset, x='Activity', y='RMSE', hue='Model', ax=axes[1], order=activity_order, showfliers=show_outliers)
         axes[1].set_title(f'Boxplot of RMSE for {target}')
         axes[1].set_ylabel('RMSE')
         axes[1].legend(title='Model', bbox_to_anchor=(1.05, 1), loc='upper left')
 
         # Plot MSE metrics
-        sns.boxplot(data=data_subset, x='Activity', y='MSE', hue='Model', ax=axes[2], order=activity_order)
+        sns.boxplot(data=data_subset, x='Activity', y='MSE', hue='Model', ax=axes[2], order=activity_order, showfliers=show_outliers)
         axes[2].set_title(f'Boxplot of MSE for {target}')
         axes[2].set_ylabel('MSE')
         axes[2].legend(title='Model', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+        # Plot NRMSE metrics
+        sns.boxplot(data=data_subset, x='Activity', y='NRMSE', hue='Model', ax=axes[3], order=activity_order, showfliers=show_outliers)
+        axes[3].set_title(f'Boxplot of NRMSE for {target}')
+        axes[3].set_ylabel('NRMSE')
+        axes[3].legend(title='Model', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+        # Plot NMSE metrics
+        sns.boxplot(data=data_subset, x='Activity', y='NMSE', hue='Model', ax=axes[4], order=activity_order, showfliers=show_outliers)
+        axes[4].set_title(f'Boxplot of NMSE for {target}')
+        axes[4].set_ylabel('NMSE')
+        axes[4].legend(title='Model', bbox_to_anchor=(1.05, 1), loc='upper left')
 
         # Adjust layout for titles and legends
         plt.tight_layout(rect=[0, 0, 1, 0.96])

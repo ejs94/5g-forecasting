@@ -169,11 +169,105 @@ def collect_univariate_metrics(activity, list_series, target_columns, model_name
     return result_records
 
 
+# def compare_series_metrics(
+#     results: pd.DataFrame, default_freq: str = "S"
+# ) -> pd.DataFrame:
+#     """
+#     Calcula as métricas MAE, RMSE e MSE para cada linha do DataFrame `results`
+#     comparando as séries temporais reais com as preditas. Se a frequência do 'Time_Index'
+#     estiver ausente, usa um valor padrão especificado.
+
+#     Args:
+#         results (pd.DataFrame): DataFrame contendo as colunas "Time_Index", "Actuals" e "Preds",
+#         que representam as séries temporais reais e preditas.
+#         default_freq (str): Frequência padrão em segundos a ser utilizada quando a frequência do 'Time_Index'
+#                             não puder ser inferida (padrão: "S" - segundos).
+
+#     Returns:
+#         pd.DataFrame: DataFrame com as métricas calculadas adicionadas como novas
+#         colunas ("MAE", "RMSE", "MSE").
+#     """
+#     # Verifica se 'results' é None ou não é um DataFrame
+#     if results is None:
+#         raise ValueError("O parâmetro 'results' não pode ser None.")
+#     if not isinstance(results, pd.DataFrame):
+#         raise TypeError("O parâmetro 'results' deve ser um DataFrame.")
+
+
+#     def validate_row(row):
+#         """
+#         Verifica se as colunas 'Time_Index', 'Actuals' e 'Preds' têm o mesmo comprimento
+#         e se não há valores NaN nos dados.
+#         """
+#         # Verifica se os comprimentos são iguais
+#         if len(row["Time_Index"]) != len(row["Actuals"]) or len(
+#             row["Time_Index"]
+#         ) != len(row["Preds"]):
+#             return False
+
+#         # Verifica se há NaN nos índices de tempo ou valores reais/preditos
+#         if (
+#             pd.isnull(row["Time_Index"]).any()
+#             or pd.isnull(row["Actuals"]).any()
+#             or pd.isnull(row["Preds"]).any()
+#         ):
+#             return False
+
+#         return True
+
+#     def get_frequency_or_default(time_idx, default_freq):
+#         """
+#         Tenta inferir a frequência de 'Time_Index'. Se não conseguir, retorna a frequência padrão.
+#         """
+#         if len(time_idx) < 3:
+#             # Se houver menos de 3 datas, usa a frequência padrão
+#             return default_freq
+#         inferred_freq = pd.infer_freq(time_idx)
+#         return inferred_freq if inferred_freq else default_freq
+
+#     def calculate_mae(row):
+#         time_idx = pd.DatetimeIndex(row["Time_Index"])
+#         freq = get_frequency_or_default(time_idx, default_freq)
+#         actual_ts = TimeSeries.from_times_and_values(
+#             time_idx, row["Actuals"], freq=freq
+#         )
+#         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
+#         return mae(actual_series=actual_ts, pred_series=pred_ts)
+
+#     def calculate_rmse(row):
+#         time_idx = pd.DatetimeIndex(row["Time_Index"])
+#         freq = get_frequency_or_default(time_idx, default_freq)
+#         actual_ts = TimeSeries.from_times_and_values(
+#             time_idx, row["Actuals"], freq=freq
+#         )
+#         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
+#         return rmse(actual_series=actual_ts, pred_series=pred_ts)
+
+#     def calculate_mse(row):
+#         time_idx = pd.DatetimeIndex(row["Time_Index"])
+#         freq = get_frequency_or_default(time_idx, default_freq)
+#         actual_ts = TimeSeries.from_times_and_values(
+#             time_idx, row["Actuals"], freq=freq
+#         )
+#         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
+#         return mse(actual_series=actual_ts, pred_series=pred_ts)
+
+#     # Filtrar linhas inválidas (com valores NaN ou desajustes de tamanho)
+#     valid_results = results[results.apply(validate_row, axis=1)].copy()
+
+#     # Aplicando as funções de métrica a cada linha válida do DataFrame
+#     valid_results["MAE"] = valid_results.apply(calculate_mae, axis=1)
+#     valid_results["RMSE"] = valid_results.apply(calculate_rmse, axis=1)
+#     valid_results["MSE"] = valid_results.apply(calculate_mse, axis=1)
+
+#     return valid_results
+
+
 def compare_series_metrics(
     results: pd.DataFrame, default_freq: str = "S"
 ) -> pd.DataFrame:
     """
-    Calcula as métricas MAE, RMSE e MSE para cada linha do DataFrame `results`
+    Calcula as métricas MAE, RMSE, MSE, NRMSE e NMSE para cada linha do DataFrame `results`
     comparando as séries temporais reais com as preditas. Se a frequência do 'Time_Index'
     estiver ausente, usa um valor padrão especificado.
 
@@ -185,7 +279,7 @@ def compare_series_metrics(
 
     Returns:
         pd.DataFrame: DataFrame com as métricas calculadas adicionadas como novas
-        colunas ("MAE", "RMSE", "MSE").
+        colunas ("MAE", "RMSE", "MSE", "NRMSE", "NMSE").
     """
     # Verifica se 'results' é None ou não é um DataFrame
     if results is None:
@@ -193,34 +287,17 @@ def compare_series_metrics(
     if not isinstance(results, pd.DataFrame):
         raise TypeError("O parâmetro 'results' deve ser um DataFrame.")
 
-
     def validate_row(row):
-        """
-        Verifica se as colunas 'Time_Index', 'Actuals' e 'Preds' têm o mesmo comprimento
-        e se não há valores NaN nos dados.
-        """
-        # Verifica se os comprimentos são iguais
-        if len(row["Time_Index"]) != len(row["Actuals"]) or len(
-            row["Time_Index"]
-        ) != len(row["Preds"]):
+        """Verifica se as colunas 'Time_Index', 'Actuals' e 'Preds' têm o mesmo comprimento e se não há valores NaN."""
+        if len(row["Time_Index"]) != len(row["Actuals"]) or len(row["Time_Index"]) != len(row["Preds"]):
             return False
-
-        # Verifica se há NaN nos índices de tempo ou valores reais/preditos
-        if (
-            pd.isnull(row["Time_Index"]).any()
-            or pd.isnull(row["Actuals"]).any()
-            or pd.isnull(row["Preds"]).any()
-        ):
+        if pd.isnull(row["Time_Index"]).any() or pd.isnull(row["Actuals"]).any() or pd.isnull(row["Preds"]).any():
             return False
-
         return True
 
     def get_frequency_or_default(time_idx, default_freq):
-        """
-        Tenta inferir a frequência de 'Time_Index'. Se não conseguir, retorna a frequência padrão.
-        """
+        """Tenta inferir a frequência de 'Time_Index'. Se não conseguir, retorna a frequência padrão."""
         if len(time_idx) < 3:
-            # Se houver menos de 3 datas, usa a frequência padrão
             return default_freq
         inferred_freq = pd.infer_freq(time_idx)
         return inferred_freq if inferred_freq else default_freq
@@ -228,29 +305,33 @@ def compare_series_metrics(
     def calculate_mae(row):
         time_idx = pd.DatetimeIndex(row["Time_Index"])
         freq = get_frequency_or_default(time_idx, default_freq)
-        actual_ts = TimeSeries.from_times_and_values(
-            time_idx, row["Actuals"], freq=freq
-        )
+        actual_ts = TimeSeries.from_times_and_values(time_idx, row["Actuals"], freq=freq)
         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
         return mae(actual_series=actual_ts, pred_series=pred_ts)
 
     def calculate_rmse(row):
         time_idx = pd.DatetimeIndex(row["Time_Index"])
         freq = get_frequency_or_default(time_idx, default_freq)
-        actual_ts = TimeSeries.from_times_and_values(
-            time_idx, row["Actuals"], freq=freq
-        )
+        actual_ts = TimeSeries.from_times_and_values(time_idx, row["Actuals"], freq=freq)
         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
         return rmse(actual_series=actual_ts, pred_series=pred_ts)
 
     def calculate_mse(row):
         time_idx = pd.DatetimeIndex(row["Time_Index"])
         freq = get_frequency_or_default(time_idx, default_freq)
-        actual_ts = TimeSeries.from_times_and_values(
-            time_idx, row["Actuals"], freq=freq
-        )
+        actual_ts = TimeSeries.from_times_and_values(time_idx, row["Actuals"], freq=freq)
         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
         return mse(actual_series=actual_ts, pred_series=pred_ts)
+
+    def calculate_nrmse(row):
+        rmse_val = calculate_rmse(row)
+        actual_range = row["Actuals"].max() - row["Actuals"].min()
+        return rmse_val / actual_range if actual_range != 0 else float("nan")
+
+    def calculate_nmse(row):
+        mse_val = calculate_mse(row)
+        actual_variance = row["Actuals"].var()
+        return mse_val / actual_variance if actual_variance != 0 else float("nan")
 
     # Filtrar linhas inválidas (com valores NaN ou desajustes de tamanho)
     valid_results = results[results.apply(validate_row, axis=1)].copy()
@@ -259,6 +340,8 @@ def compare_series_metrics(
     valid_results["MAE"] = valid_results.apply(calculate_mae, axis=1)
     valid_results["RMSE"] = valid_results.apply(calculate_rmse, axis=1)
     valid_results["MSE"] = valid_results.apply(calculate_mse, axis=1)
+    valid_results["NRMSE"] = valid_results.apply(calculate_nrmse, axis=1)
+    valid_results["NMSE"] = valid_results.apply(calculate_nmse, axis=1)
 
     return valid_results
 

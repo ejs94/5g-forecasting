@@ -59,3 +59,22 @@ services:
   #           - driver: nvidia
   #             count: 1
   #             capabilities: [gpu]
+
+  gpu-check:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu_check
+    # image: nvidia/cuda:12.2.0-base-ubuntu22.04
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities:
+              - gpu
+              - utility
+              - compute
+    security_opt:
+      - label=disable
+    entrypoint: ["nvidia-smi", "-L"]

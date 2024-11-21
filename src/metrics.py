@@ -374,3 +374,104 @@ def calculate_grouped_statistics(df):
         MSE_Mean=("MSE", "mean"),
     )
     return grouped_stats
+
+
+
+def evaluate_global_model(
+    model,
+    ts: TimeSeries,
+    H: int,
+    model_name: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Avalia um modelo global como N-BEATS ou LSTM usando a série temporal completa,
+    treinando o modelo com todos os dados disponíveis e realizando previsões para o horizonte H.
+
+    :param model: Modelo de previsão global (N-BEATS, LSTM, etc.) a ser avaliado.
+    :param ts: Série temporal completa para avaliação.
+    :param H: Tamanho do horizonte de previsão (em unidades de tempo).
+    :param model_name: Nome do modelo (opcional). Se None, usa o nome da classe do modelo.
+
+    :return: Dicionário contendo o nome do modelo, métricas de avaliação e tempo de execução.
+    """
+
+    if model_name is None:
+        model_name = type(model).__name__
+
+    # Pré-processamento com filler e scaler
+    filler = MissingValuesFiller()
+    scaler = Scaler()
+    pipe = Pipeline([filler, scaler])
+
+    ts_transformed = pipe.fit_transform(ts)
+    data = ts_transformed.values()
+    times = ts_transformed.time_index
+
+    # Treinamento do modelo com todos os dados disponíveis
+    start_time = time.time()
+
+    try:
+        model.fit(ts_transformed)
+
+        # Fazer previsões para o horizonte H
+        y_pred = model.predict(H)
+
+        # Reverter as predições para a escala original
+        actuals_series = scaler.inverse_transform(ts_transformed).all_values().flatten()
+        preds_series = scaler.inverse_transform(y_pred).all_values().flatten()
+
+        elapsed_time = time.time() - start_time
+
+        results = {
+            "Time_Index": times.values,
+            "Model": model_name,
+            "Actuals": actuals_series,
+            "Preds": preds_series,
+            "ElapsedTime": elapsed_time,
+        }
+
+    except Exception as e:
+        print(f"Erro ao processar o modelo: {e}")
+        raise
+
+    return results
+
+
+def collect_global_model_metrics(
+    activity, list_series, target_columns, model_name, model, H=1
+) -> pd.DataFrame:
+    """
+    Coleta e salva métricas univariadas para uma lista de séries temporais utilizando
+    um modelo global de previsão (como N-BEATS, LSTM).
+
+    Args:
+        activity (str): Nome da atividade a ser avaliada.
+        list_series (list): Lista de séries temporais, cada uma contendo colunas de KPIs.
+        target_columns (list): Lista de colunas (KPIs) que serão avaliadas nas séries.
+        model_name (str): Nome do modelo de previsão.
+        model: Modelo global de previsão a ser utilizado.
+        H (int): Horizonte de previsão.
+
+    Returns:
+        pd.DataFrame: DataFrame contendo os resultados das métricas para cada série e KPI.
+    """
+
+    result_records = []
+
+    # Itera sobre cada série temporal
+    for i, series in enumerate(list_series):
+        for kpi in target_columns:
+            try:
+                # Avalia o modelo com a série temporal para o KPI específico
+                results = evaluate_global_model(
+                    model, series[kpi], H, model_name
+                )
+                results["target"] = kpi
+                results["Activity"] = activity
+                result_records.append(results)
+            except Exception as e:
+                print(f"Erro ao processar a série {i} com {kpi}: {e}")
+                continue
+
+    # Converte a lista de resultados em um DataFrame e retorna
+    return pd.DataFrame(result_records)

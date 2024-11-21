@@ -1,4 +1,4 @@
-Aqui está a versão aprimorada do markdown, explicando a conexão ao notebook pelo VSCode:
+Here’s the updated markdown incorporating the note about using `docker run` for GPU support due to the unresolved Docker Compose issue:
 
 ---
 
@@ -28,6 +28,21 @@ To start JupyterLab in Docker, run:
 ```bash
 docker compose up -d jupyterlab
 ```
+
+#### 4. Running GPU Services  
+As there is currently an unresolved issue with **Docker Compose** and GPU support, GPU-enabled services should be run using `docker run`. For example, to run a GPU-enabled training process:
+
+Building:
+```bash
+docker build -t darts_gpu_image -f Dockerfile.gpu .
+```
+
+Running:
+```bash
+docker run --rm --gpus all --name darts_gpu_container -v %cd%/data:/app/data -v %cd%/src:/app -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=compute,utility darts_gpu_image python3 train_multivariate.py
+```
+
+---
 
 ### Accessing Jupyter Notebooks in VSCode ✨
 Once JupyterLab is running, you can connect to the notebook interface in **VSCode**.
@@ -62,5 +77,4 @@ Now you can edit and run the Jupyter notebooks inside **VSCode**, with the backe
 
 ---
 
-This approach allows you to work seamlessly between Docker, JupyterLab, and VSCode, making your workflow smooth and efficient!
-
+This workflow ensures compatibility across GPU and non-GPU systems, providing flexibility and efficiency for your experiments.

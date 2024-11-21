@@ -12,6 +12,7 @@ from tqdm.auto import tqdm
 from utils import (
     convert_dfs_to_ts,
     separate_by_uid_and_frequency,
+    train_and_evaluate_global_model  # Importando a função de treinamento
 )
 
 
@@ -98,5 +99,20 @@ for model_name, model in models.items():
         # Nome do arquivo de saída
         output_file = f"multi_{model_name}_{activity}"
 
+        # Chama a função para treinar e avaliar o modelo global
+        success = train_and_evaluate_global_model(
+            activity=activity,
+            model_name=model_name,
+            model=model,
+            list_series=series_list,
+            target_columns=config["target_columns"],
+            output_file=output_file,
+            H=config["H"]
+        )
+        
+        if success:
+            print(f"Modelo {model_name} para {activity} treinado e avaliado com sucesso!")
+        else:
+            print(f"Falha no treinamento do modelo {model_name} para {activity}.")
 
 print("---Finalizado---")

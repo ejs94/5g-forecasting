@@ -5,60 +5,59 @@ services:
       dockerfile: Dockerfile.preprocess
     container_name: preprocess_datasets
     volumes:
-      - ./data:/app/data  # Mount shared volume for the dataset
-    command: python3 prepare_dataset.py  # Runs preprocessing and stops
-  
-  darts-cpu:
+      - ./data:/app/data # Mount shared volume for the dataset
+    command: python3 prepare_dataset.py # Runs preprocessing and stops
+
+  univariate-cpu:
     build:
       context: .
       dockerfile: Dockerfile.cpu
-    container_name: darts_cpu_container
+    container_name: univariate_cpu
     volumes:
       - ./data:/app/data
       - ./src:/app
     command: python3 train_univariate.py
 
-  darts-gpu:
+  multivariate-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    container_name: multivariate_cpu
+    volumes:
+      - ./data:/app/data
+      - ./src:/app
+    command: python3 train_multivariate.py
+
+  multivariate-gpu:
     build:
       context: .
       dockerfile: Dockerfile.gpu
-    container_name: darts_gpu_container
-    runtime: nvidia  # Ativa o suporte a GPU sem precisar de deploy.resources
+    container_name: multivariate_gpu
+    runtime: nvidia # Ativa o suporte a GPU sem precisar de deploy.resources
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all  # Configura a visibilidade de todas as GPUs
+      - NVIDIA_VISIBLE_DEVICES=all # Configura a visibilidade de todas as GPUs
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
       - ./data:/app/data
       - ./src:/app
     command: python3 train_multivariate.py
-  
+
   jupyterlab:
     build:
       context: .
       dockerfile: Dockerfile.jupyterlab
     container_name: jupyterlab_container
     ports:
-      - "8888:8888"  # Porta para acesso externo
+      - "8888:8888" # Porta para acesso externo
     volumes:
       - ./data:/home/jovyan/work/data
       - ./notebooks:/home/jovyan/work
       - ./src:/home/jovyan/work/src
     environment:
-      - NB_UID=1000  # UID do usuário jovyan
-      - NB_GID=100   # GID do grupo jovyan
-      - NOTES_DIR=/home/jovyan/work  # Define o diretório de trabalho padrão
-    command:  start-notebook.py --IdentityProvider.token='MeuProjeto2024@' --ServerApp.ip='0.0.0.0' --ServerApp.allow_remote_access=True --ServerApp.root_dir='/home/jovyan/work'
-
-  # test:
-  #   image: nvidia/cuda:12.5.0-runtime-ubuntu22.04
-  #   command: nvidia-smi
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
+      - NB_UID=1000 # UID do usuário jovyan
+      - NB_GID=100 # GID do grupo jovyan
+      - NOTES_DIR=/home/jovyan/work # Define o diretório de trabalho padrão
+    command: start-notebook.py --IdentityProvider.token='MeuProjeto2024@' --ServerApp.ip='0.0.0.0' --ServerApp.allow_remote_access=True --ServerApp.root_dir='/home/jovyan/work'
 
   gpu-check:
     build:
@@ -72,9 +71,9 @@ services:
           devices:
             - driver: nvidia
               capabilities:
-              - gpu
-              - utility
-              - compute
+                - gpu
+                - utility
+                - compute
     security_opt:
       - label=disable
-    entrypoint: ["nvidia-smi", "-L"]
+    entrypoint: [ "nvidia-smi", "-L" ]

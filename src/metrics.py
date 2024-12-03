@@ -13,6 +13,7 @@ from darts.dataprocessing.transformers import MissingValuesFiller, Scaler
 from darts.metrics import mae, mse, rmse
 from tqdm.auto import tqdm
 
+
 def sliding_window_cross_validate_and_evaluate(
     model,
     ts: TimeSeries,
@@ -131,7 +132,9 @@ def sliding_window_cross_validate_and_evaluate(
     return results
 
 
-def collect_univariate_metrics(activity, list_series, target_columns, model_name, model, K=5, H=1):
+def collect_univariate_metrics(
+    activity, list_series, target_columns, model_name, model, K=5, H=1
+):
     """
     Coleta e salva métricas univariadas para uma lista de séries temporais utilizando
     um modelo de previsão. Os resultados são salvos em formato Parquet.
@@ -148,7 +151,7 @@ def collect_univariate_metrics(activity, list_series, target_columns, model_name
     Returns:
         pd.DataFrame: DataFrame contendo os resultados das métricas para cada série e KPI.
     """
-    
+
     result_records = []
 
     # Itera sobre cada série temporal
@@ -167,100 +170,6 @@ def collect_univariate_metrics(activity, list_series, target_columns, model_name
                 continue
 
     return result_records
-
-
-# def compare_series_metrics(
-#     results: pd.DataFrame, default_freq: str = "S"
-# ) -> pd.DataFrame:
-#     """
-#     Calcula as métricas MAE, RMSE e MSE para cada linha do DataFrame `results`
-#     comparando as séries temporais reais com as preditas. Se a frequência do 'Time_Index'
-#     estiver ausente, usa um valor padrão especificado.
-
-#     Args:
-#         results (pd.DataFrame): DataFrame contendo as colunas "Time_Index", "Actuals" e "Preds",
-#         que representam as séries temporais reais e preditas.
-#         default_freq (str): Frequência padrão em segundos a ser utilizada quando a frequência do 'Time_Index'
-#                             não puder ser inferida (padrão: "S" - segundos).
-
-#     Returns:
-#         pd.DataFrame: DataFrame com as métricas calculadas adicionadas como novas
-#         colunas ("MAE", "RMSE", "MSE").
-#     """
-#     # Verifica se 'results' é None ou não é um DataFrame
-#     if results is None:
-#         raise ValueError("O parâmetro 'results' não pode ser None.")
-#     if not isinstance(results, pd.DataFrame):
-#         raise TypeError("O parâmetro 'results' deve ser um DataFrame.")
-
-
-#     def validate_row(row):
-#         """
-#         Verifica se as colunas 'Time_Index', 'Actuals' e 'Preds' têm o mesmo comprimento
-#         e se não há valores NaN nos dados.
-#         """
-#         # Verifica se os comprimentos são iguais
-#         if len(row["Time_Index"]) != len(row["Actuals"]) or len(
-#             row["Time_Index"]
-#         ) != len(row["Preds"]):
-#             return False
-
-#         # Verifica se há NaN nos índices de tempo ou valores reais/preditos
-#         if (
-#             pd.isnull(row["Time_Index"]).any()
-#             or pd.isnull(row["Actuals"]).any()
-#             or pd.isnull(row["Preds"]).any()
-#         ):
-#             return False
-
-#         return True
-
-#     def get_frequency_or_default(time_idx, default_freq):
-#         """
-#         Tenta inferir a frequência de 'Time_Index'. Se não conseguir, retorna a frequência padrão.
-#         """
-#         if len(time_idx) < 3:
-#             # Se houver menos de 3 datas, usa a frequência padrão
-#             return default_freq
-#         inferred_freq = pd.infer_freq(time_idx)
-#         return inferred_freq if inferred_freq else default_freq
-
-#     def calculate_mae(row):
-#         time_idx = pd.DatetimeIndex(row["Time_Index"])
-#         freq = get_frequency_or_default(time_idx, default_freq)
-#         actual_ts = TimeSeries.from_times_and_values(
-#             time_idx, row["Actuals"], freq=freq
-#         )
-#         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
-#         return mae(actual_series=actual_ts, pred_series=pred_ts)
-
-#     def calculate_rmse(row):
-#         time_idx = pd.DatetimeIndex(row["Time_Index"])
-#         freq = get_frequency_or_default(time_idx, default_freq)
-#         actual_ts = TimeSeries.from_times_and_values(
-#             time_idx, row["Actuals"], freq=freq
-#         )
-#         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
-#         return rmse(actual_series=actual_ts, pred_series=pred_ts)
-
-#     def calculate_mse(row):
-#         time_idx = pd.DatetimeIndex(row["Time_Index"])
-#         freq = get_frequency_or_default(time_idx, default_freq)
-#         actual_ts = TimeSeries.from_times_and_values(
-#             time_idx, row["Actuals"], freq=freq
-#         )
-#         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
-#         return mse(actual_series=actual_ts, pred_series=pred_ts)
-
-#     # Filtrar linhas inválidas (com valores NaN ou desajustes de tamanho)
-#     valid_results = results[results.apply(validate_row, axis=1)].copy()
-
-#     # Aplicando as funções de métrica a cada linha válida do DataFrame
-#     valid_results["MAE"] = valid_results.apply(calculate_mae, axis=1)
-#     valid_results["RMSE"] = valid_results.apply(calculate_rmse, axis=1)
-#     valid_results["MSE"] = valid_results.apply(calculate_mse, axis=1)
-
-#     return valid_results
 
 
 def compare_series_metrics(
@@ -289,9 +198,15 @@ def compare_series_metrics(
 
     def validate_row(row):
         """Verifica se as colunas 'Time_Index', 'Actuals' e 'Preds' têm o mesmo comprimento e se não há valores NaN."""
-        if len(row["Time_Index"]) != len(row["Actuals"]) or len(row["Time_Index"]) != len(row["Preds"]):
+        if len(row["Time_Index"]) != len(row["Actuals"]) or len(
+            row["Time_Index"]
+        ) != len(row["Preds"]):
             return False
-        if pd.isnull(row["Time_Index"]).any() or pd.isnull(row["Actuals"]).any() or pd.isnull(row["Preds"]).any():
+        if (
+            pd.isnull(row["Time_Index"]).any()
+            or pd.isnull(row["Actuals"]).any()
+            or pd.isnull(row["Preds"]).any()
+        ):
             return False
         return True
 
@@ -305,21 +220,27 @@ def compare_series_metrics(
     def calculate_mae(row):
         time_idx = pd.DatetimeIndex(row["Time_Index"])
         freq = get_frequency_or_default(time_idx, default_freq)
-        actual_ts = TimeSeries.from_times_and_values(time_idx, row["Actuals"], freq=freq)
+        actual_ts = TimeSeries.from_times_and_values(
+            time_idx, row["Actuals"], freq=freq
+        )
         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
         return mae(actual_series=actual_ts, pred_series=pred_ts)
 
     def calculate_rmse(row):
         time_idx = pd.DatetimeIndex(row["Time_Index"])
         freq = get_frequency_or_default(time_idx, default_freq)
-        actual_ts = TimeSeries.from_times_and_values(time_idx, row["Actuals"], freq=freq)
+        actual_ts = TimeSeries.from_times_and_values(
+            time_idx, row["Actuals"], freq=freq
+        )
         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
         return rmse(actual_series=actual_ts, pred_series=pred_ts)
 
     def calculate_mse(row):
         time_idx = pd.DatetimeIndex(row["Time_Index"])
         freq = get_frequency_or_default(time_idx, default_freq)
-        actual_ts = TimeSeries.from_times_and_values(time_idx, row["Actuals"], freq=freq)
+        actual_ts = TimeSeries.from_times_and_values(
+            time_idx, row["Actuals"], freq=freq
+        )
         pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
         return mse(actual_series=actual_ts, pred_series=pred_ts)
 
@@ -376,16 +297,12 @@ def calculate_grouped_statistics(df):
     return grouped_stats
 
 
-
 def evaluate_global_model(
-    model,
-    ts: TimeSeries,
-    H: int,
-    model_name: Optional[str] = None
+    model, ts: TimeSeries, H: int, model_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Avalia um modelo global como N-BEATS ou LSTM usando a série temporal completa,
-    treinando o modelo com todos os dados disponíveis e realizando previsões para o horizonte H.
+    treinando o modelo com uma parte dos dados disponíveis e validando no horizonte H.
 
     :param model: Modelo de previsão global (N-BEATS, LSTM, etc.) a ser avaliado.
     :param ts: Série temporal completa para avaliação.
@@ -404,26 +321,27 @@ def evaluate_global_model(
     pipe = Pipeline([filler, scaler])
 
     ts_transformed = pipe.fit_transform(ts)
-    data = ts_transformed.values()
-    times = ts_transformed.time_index
 
-    # Treinamento do modelo com todos os dados disponíveis
+    # Dividindo a série temporal em treino e teste
+    train_series, test_series = ts_transformed[:-H], ts_transformed[-H:]
+
+    # Treinamento do modelo com os dados de treino
     start_time = time.time()
 
     try:
-        model.fit(ts_transformed)
+        model.fit(train_series)
 
         # Fazer previsões para o horizonte H
         y_pred = model.predict(H)
 
-        # Reverter as predições para a escala original
-        actuals_series = scaler.inverse_transform(ts_transformed).all_values().flatten()
-        preds_series = scaler.inverse_transform(y_pred).all_values().flatten()
+        # Reverter as predições e os dados reais para a escala original
+        actuals_series = scaler.inverse_transform(test_series).values().flatten()
+        preds_series = scaler.inverse_transform(y_pred).values().flatten()
 
         elapsed_time = time.time() - start_time
 
+        # Construção do dicionário de resultados
         results = {
-            "Time_Index": times.values,
             "Model": model_name,
             "Actuals": actuals_series,
             "Preds": preds_series,
@@ -463,9 +381,7 @@ def collect_global_model_metrics(
         for kpi in target_columns:
             try:
                 # Avalia o modelo com a série temporal para o KPI específico
-                results = evaluate_global_model(
-                    model, series[kpi], H, model_name
-                )
+                results = evaluate_global_model(model, series[kpi], H, model_name)
                 results["target"] = kpi
                 results["Activity"] = activity
                 result_records.append(results)

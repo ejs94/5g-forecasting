@@ -1,20 +1,19 @@
 import os
 import warnings
+
 import numpy as np
 import pandas as pd
 import torch
-
 from darts import TimeSeries
-from darts.models import NBEATSModel
+from darts.models import NBEATSModel, RNNModel
 from darts.utils.callbacks import TFMProgressBar
 from tqdm.auto import tqdm
 
 from utils import (
     convert_dfs_to_ts,
     separate_by_uid_and_frequency,
-    train_and_evaluate_global_model  # Importando a função de treinamento
+    train_and_evaluate_global_model,  # Importando a função de treinamento
 )
-
 
 print("---Verificando se há GPU---")
 # Verifica se a GPU está disponível
@@ -68,25 +67,54 @@ activities = {
 
 print("---Configurando os modelos---")
 
-def generate_torch_kwargs():
-    # run torch models on device, and disable progress bars for all model stages except training.
+
+def generate_torch_kwargs(use_gpu=True):
+    """
+    Gera os argumentos para o treinamento do modelo no Darts, alternando entre GPU e CPU.
+
+    Args:
+        use_gpu (bool): Se True, usa GPU; se False, usa CPU.
+
+    Returns:
+        dict: Dicionário de configurações para o trainer do PyTorch.
+    """
+    device = "gpu" if use_gpu else "cpu"
+    devices = (
+        [0] if use_gpu else None
+    )  # Define o índice do dispositivo GPU, ou None para CPU.
+
     return {
         "pl_trainer_kwargs": {
-            "accelerator": "gpu",
-            "devices": [0],
+            "accelerator": device,
+            "devices": devices,
             "callbacks": [TFMProgressBar(enable_train_bar_only=True)],
         }
     }
 
+
 # Mapeamento dos modelos
 models = {
-    "NBEATS": NBEATSModel(
-    input_chunk_length=config["K"],
-    output_chunk_length=config["H"],
-    n_epochs=100,
-    random_state=None,
-    **generate_torch_kwargs()),
+    # "NBEATS": NBEATSModel(
+    #     input_chunk_length=config["K"],
+    #     output_chunk_length=config["H"],
+    #     n_epochs=100,
+    #     random_state=None,
+    #     **generate_torch_kwargs(),
+    # ),
+    "LSTM": RNNModel(
+        model="LSTM",
+        input_chunk_length=config["K"],
+        training_length=50,
+        hidden_dim=50,
+        batch_size=16,
+        n_epochs=100,
+        dropout=0,
+        optimizer_kwargs={"lr": 1e-3},
+        random_state=None,
+        force_reset=True,
+    ),
 }
+
 
 print("---Iniciando os treinamentos---")
 
@@ -107,11 +135,13 @@ for model_name, model in models.items():
             list_series=series_list,
             target_columns=config["target_columns"],
             output_file=output_file,
-            H=config["H"]
+            H=config["H"],
         )
-        
+
         if success:
-            print(f"Modelo {model_name} para {activity} treinado e avaliado com sucesso!")
+            print(
+                f"Modelo {model_name} para {activity} treinado e avaliado com sucesso!"
+            )
         else:
             print(f"Falha no treinamento do modelo {model_name} para {activity}.")
 

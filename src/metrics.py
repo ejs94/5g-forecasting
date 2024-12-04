@@ -378,16 +378,14 @@ def collect_global_model_metrics(
 
     # Itera sobre cada série temporal
     for i, series in enumerate(list_series):
-        for kpi in target_columns:
-            try:
-                # Avalia o modelo com a série temporal para o KPI específico
-                results = evaluate_global_model(model, series[kpi], H, model_name)
-                results["target"] = kpi
-                results["Activity"] = activity
-                result_records.append(results)
-            except Exception as e:
-                print(f"Erro ao processar a série {i} com {kpi}: {e}")
-                continue
+        try:
+            # Avalia o modelo com a série temporal para o KPI específico
+            results = evaluate_global_model(model, series, H, model_name)
+            results["Activity"] = activity
+            result_records.append(results)
+        except Exception as e:
+            print(f"Erro ao processar a série {i}: {e}")
+            continue
 
     # Converte a lista de resultados em um DataFrame e retorna
     return pd.DataFrame(result_records)

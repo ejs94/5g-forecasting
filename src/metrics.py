@@ -375,9 +375,11 @@ def collect_global_model_metrics(
     """
 
     result_records = []
+    total_series = len(list_series)
 
     # Itera sobre cada série temporal
     for i, series in enumerate(list_series):
+        print(f"---> Processando série {i}/{total_series - 1}... <---")
         try:
             # Avalia o modelo com a série temporal para o KPI específico
             results = evaluate_global_model(model, series, H, model_name)

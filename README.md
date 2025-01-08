@@ -1,9 +1,6 @@
-Here’s the updated markdown incorporating the note about using `docker run` for GPU support due to the unresolved Docker Compose issue:
+# 5G Network Forecasting
 
----
-
-# nbeats-5g-forecasting
-This repository contains the code for a research study exploring the use of the N-BEATS algorithm for forecasting 5G network quality.
+This repository contains the source code and workflow for a research study comparing statistical and machine learning models for predicting 5G network signal quality metrics, such as RSRP and RSRQ. These predictions aim to optimize Radio Resource Management (RRM) parameters, improving handover efficiency, network reliability, and overall user experience in dynamic 5G environments.
 
 ---
 
@@ -41,6 +38,17 @@ Running:
 ```bash
 docker run --rm --gpus all --name darts_gpu_container -v %cd%/data:/app/data -v %cd%/src:/app -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=compute,utility darts_gpu_image python3 train_multivariate.py
 ```
+
+---
+
+### Handling File Manipulation in the `data` Folder
+If you need to manipulate or delete files in the `data` folder but encounter permission issues, you can run a temporary Docker container with elevated permissions to access the folder directly. Use the following command:
+
+```bash
+docker run -it --rm -v $(pwd)/data:/data ubuntu /bin/bash
+```
+
+This command opens an interactive terminal in a lightweight **Ubuntu** container with the `data` folder mounted, allowing you to perform any required file operations (like deleting files). Make sure to exit the container once done to remove it automatically.
 
 ---
 

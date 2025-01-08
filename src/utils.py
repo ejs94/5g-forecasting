@@ -9,11 +9,10 @@ from darts import TimeSeries
 from darts.dataprocessing import Pipeline
 from darts.dataprocessing.transformers import MissingValuesFiller, Scaler
 
-from metrics import collect_univariate_metrics, collect_global_model_metrics
+from metrics import collect_univariate_metrics, evaluate_global_model
 
 
 def extract_5G_dataset(path: os.path) -> list[pd.DataFrame]:
-
     df_static = []
     df_driving = []
 
@@ -106,7 +105,6 @@ def preprocess_5G_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def compact_5G_dataset(df: pd.DataFrame) -> pd.DataFrame:
-
     df = df.reset_index()
     compact_df = (
         df.groupby("Uid")[["Timestamp", "RSRP", "RSRQ", "SNR", "CQI", "RSSI"]]
@@ -207,7 +205,7 @@ def training_model_for_activity(
     target_columns,
     output_file: str,
     K: int,
-    H: int
+    H: int,
 ) -> bool:
     """
     Trains a univariate model for a specific activity and indicates whether the operation was successful.
@@ -225,9 +223,9 @@ def training_model_for_activity(
     Returns:
         bool: True if the operation was successful, False otherwise.
     """
-    
+
     print(f"---{model_name} Forecast---")
-    
+
     try:
         # Collect univariate metrics
         result = collect_univariate_metrics(
@@ -237,9 +235,11 @@ def training_model_for_activity(
         if result is None:
             print(f"Warning: Result for {activity} using {model_name} is None.")
             return False  # Indicate failure if result is None
-        
+
         # Define the path to save the file, adding the .parquet extension
-        output_path = os.path.join(os.curdir, "data", "results", f"{output_file}.parquet")
+        output_path = os.path.join(
+            os.curdir, "data", "results", f"{output_file}.parquet"
+        )
 
         # Create the directory if it doesn't exist
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -255,7 +255,7 @@ def training_model_for_activity(
     except Exception as e:
         print(f"Error processing activity '{activity}' with model '{model_name}': {e}")
         return False  # Indicate failure in case of an exception
-    
+
 
 def train_and_evaluate_global_model(
     activity: str,
@@ -263,8 +263,7 @@ def train_and_evaluate_global_model(
     model,
     list_series,
     target_columns,
-    output_file: str,
-    H: int
+    H: int,
 ) -> bool:
     """
     Treina e avalia um modelo global (N-BEATS, LSTM) para uma atividade específica,
@@ -282,21 +281,37 @@ def train_and_evaluate_global_model(
     Returns:
         bool: True se a operação foi bem-sucedida, False caso contrário.
     """
+    output_file = (f"mult_{model_name}_{activity}",)
 
     print(f"---{model_name} Forecast---")
 
     try:
-        # Coleta as métricas univariadas
-        result = collect_global_model_metrics(
-            activity, list_series, target_columns, model_name, model, H
-        )
+        result_records = []
+        total_series = len(list_series)
+
+        # Itera sobre cada série temporal
+        for i, series in enumerate(list_series):
+            print(f"---> Processando série {i}/{total_series - 1}... <---")
+            try:
+                # Avalia o modelo com a série temporal para o KPI específico
+                results = evaluate_global_model(model, series, H, model_name)
+                results["Activity"] = activity
+                result_records.append(results)
+            except Exception as e:
+                print(f"Erro ao processar a série {i}: {e}")
+                continue
+
+        # Converte a lista de resultados em um DataFrame e retorna
+        result = pd.DataFrame(result_records)
 
         if result.empty:
             print(f"Warning: Result for {activity} using {model_name} is empty.")
             return False  # Indica falha se o resultado for vazio
 
         # Define o caminho para salvar o arquivo Parquet
-        output_path = os.path.join(os.curdir, "data", "results", f"{output_file}.parquet")
+        output_path = os.path.join(
+            os.curdir, "data", "results", "multivariate", f"{output_file}.parquet"
+        )
 
         # Cria o diretório, se necessário
         os.makedirs(os.path.dirname(output_path), exist_ok=True)

@@ -97,21 +97,28 @@ models = {
     # "NBEATS": NBEATSModel(
     #     input_chunk_length=config["K"],
     #     output_chunk_length=config["H"],
+    #     generic_architecture=False,
+    #     num_blocks=3,
+    #     num_layers=4,
+    #     layer_widths=512,
     #     n_epochs=100,
+    #     nr_epochs_val_period=1,
+    #     batch_size=64,
     #     random_state=None,
-    #     **generate_torch_kwargs(),
+    #     # **generate_torch_kwargs(),
     # ),
     "LSTM": RNNModel(
         model="LSTM",
         input_chunk_length=config["K"],
         training_length=50,
         hidden_dim=50,
-        batch_size=16,
+        batch_size=64,
         n_epochs=100,
         dropout=0,
         optimizer_kwargs={"lr": 1e-3},
         random_state=None,
         force_reset=True,
+        # **generate_torch_kwargs(),
     ),
 }
 
@@ -119,13 +126,11 @@ models = {
 print("---Iniciando os treinamentos---")
 
 for model_name, model in models.items():
+    model.model_name = model_name
     for activity, series_list in activities.items():
         print(
             f"---Iniciando treinamento para a atividade: {activity} com o modelo: {model_name}---"
         )
-
-        # Nome do arquivo de saída
-        output_file = f"multi_{model_name}_{activity}"
 
         # Chama a função para treinar e avaliar o modelo global
         success = train_and_evaluate_global_model(
@@ -134,7 +139,6 @@ for model_name, model in models.items():
             model=model,
             list_series=series_list,
             target_columns=config["target_columns"],
-            output_file=output_file,
             H=config["H"],
         )
 

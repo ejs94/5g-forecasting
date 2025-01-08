@@ -335,8 +335,8 @@ def evaluate_global_model(
         y_pred = model.predict(H)
 
         # Reverter as predições e os dados reais para a escala original
-        actuals_series = scaler.inverse_transform(test_series).values().flatten()
-        preds_series = scaler.inverse_transform(y_pred).values().flatten()
+        actuals_series = scaler.inverse_transform(test_series)
+        preds_series = scaler.inverse_transform(y_pred)
 
         elapsed_time = time.time() - start_time
 
@@ -353,41 +353,3 @@ def evaluate_global_model(
         raise
 
     return results
-
-
-def collect_global_model_metrics(
-    activity, list_series, target_columns, model_name, model, H=1
-) -> pd.DataFrame:
-    """
-    Coleta e salva métricas univariadas para uma lista de séries temporais utilizando
-    um modelo global de previsão (como N-BEATS, LSTM).
-
-    Args:
-        activity (str): Nome da atividade a ser avaliada.
-        list_series (list): Lista de séries temporais, cada uma contendo colunas de KPIs.
-        target_columns (list): Lista de colunas (KPIs) que serão avaliadas nas séries.
-        model_name (str): Nome do modelo de previsão.
-        model: Modelo global de previsão a ser utilizado.
-        H (int): Horizonte de previsão.
-
-    Returns:
-        pd.DataFrame: DataFrame contendo os resultados das métricas para cada série e KPI.
-    """
-
-    result_records = []
-    total_series = len(list_series)
-
-    # Itera sobre cada série temporal
-    for i, series in enumerate(list_series):
-        print(f"---> Processando série {i}/{total_series - 1}... <---")
-        try:
-            # Avalia o modelo com a série temporal para o KPI específico
-            results = evaluate_global_model(model, series, H, model_name)
-            results["Activity"] = activity
-            result_records.append(results)
-        except Exception as e:
-            print(f"Erro ao processar a série {i}: {e}")
-            continue
-
-    # Converte a lista de resultados em um DataFrame e retorna
-    return pd.DataFrame(result_records)

@@ -16,7 +16,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./src:/app
-    command: python3 train_univariate.py
+    command: python3 train_univariate_models.py
 
   multivariate-cpu:
     build:

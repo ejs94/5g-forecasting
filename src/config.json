@@ -1,0 +1,12 @@
+{
+    "H": 10,
+    "K": 50,
+    "update_interval": 10,
+    "target_columns": [
+        "RSRP",
+        "RSRQ",
+        "SNR",
+        "CQI",
+        "RSSI"
+    ]
+}

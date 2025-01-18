@@ -10,7 +10,7 @@ from darts.dataprocessing import Pipeline
 from darts.dataprocessing.transformers import MissingValuesFiller, Scaler
 
 # from darts.models import ForecastingModel
-from darts.metrics import mae, mse, rmse
+from darts.metrics import mae, rmse, mse
 from tqdm.auto import tqdm
 
 
@@ -132,137 +132,89 @@ def sliding_window_cross_validate_and_evaluate(
     return results
 
 
-def collect_univariate_metrics(
-    activity, list_series, target_columns, model_name, model, K=5, H=1
-):
+def compare_series_metrics(results: pd.DataFrame) -> pd.DataFrame:
     """
-    Coleta e salva métricas univariadas para uma lista de séries temporais utilizando
-    um modelo de previsão. Os resultados são salvos em formato Parquet.
-
-    Args:
-        list_series (list): Lista de séries temporais, cada uma contendo colunas de KPIs.
-        target_columns (list): Lista de colunas (KPIs) que serão avaliadas nas séries.
-        model_name (str): Nome do modelo de previsão.
-        model: Modelo de previsão a ser utilizado.
-        output_file (str): Nome do arquivo de saída (formato .parquet).
-        K (int): Número de subconjuntos para validação cruzada. Padrão: 5.
-        H (int): Horizonte de previsão. Padrão: 1.
-
-    Returns:
-        pd.DataFrame: DataFrame contendo os resultados das métricas para cada série e KPI.
-    """
-
-    result_records = []
-
-    # Itera sobre cada série temporal
-    for i, series in enumerate(list_series):
-        for kpi in target_columns:
-            try:
-                # Avalia e coleta os resultados para o KPI
-                results = sliding_window_cross_validate_and_evaluate(
-                    model, series[kpi], K, H, H, model_name
-                )
-                results["target"] = kpi
-                results["Activity"] = activity
-                result_records.append(results)
-            except Exception as e:
-                print(f"Erro ao processar a série {i} com {kpi}: {e}")
-                continue
-
-    return result_records
-
-
-def compare_series_metrics(
-    results: pd.DataFrame, default_freq: str = "S"
-) -> pd.DataFrame:
-    """
-    Calcula as métricas MAE, RMSE, MSE, NRMSE e NMSE para cada linha do DataFrame `results`
+    Calcula as métricas MAE, RMSE, MSE, NRMSE, NMSE e RMSSE para cada linha do DataFrame `results`
     comparando as séries temporais reais com as preditas. Se a frequência do 'Time_Index'
     estiver ausente, usa um valor padrão especificado.
 
     Args:
-        results (pd.DataFrame): DataFrame contendo as colunas "Time_Index", "Actuals" e "Preds",
-        que representam as séries temporais reais e preditas.
-        default_freq (str): Frequência padrão em segundos a ser utilizada quando a frequência do 'Time_Index'
-                            não puder ser inferida (padrão: "S" - segundos).
+        results (pd.DataFrame): DataFrame contendo as colunas "Actuals_index", "Actuals_values", "Preds_index"
+                                e "Preds_values", que representam as séries temporais reais e preditas.
 
     Returns:
         pd.DataFrame: DataFrame com as métricas calculadas adicionadas como novas
-        colunas ("MAE", "RMSE", "MSE", "NRMSE", "NMSE").
+        colunas ("MAE", "RMSE", "MSE", "NRMSE", "NMSE", "RMSSE").
     """
-    # Verifica se 'results' é None ou não é um DataFrame
     if results is None:
         raise ValueError("O parâmetro 'results' não pode ser None.")
     if not isinstance(results, pd.DataFrame):
         raise TypeError("O parâmetro 'results' deve ser um DataFrame.")
 
     def validate_row(row):
-        """Verifica se as colunas 'Time_Index', 'Actuals' e 'Preds' têm o mesmo comprimento e se não há valores NaN."""
-        if len(row["Time_Index"]) != len(row["Actuals"]) or len(
-            row["Time_Index"]
-        ) != len(row["Preds"]):
-            return False
-        if (
-            pd.isnull(row["Time_Index"]).any()
-            or pd.isnull(row["Actuals"]).any()
-            or pd.isnull(row["Preds"]).any()
-        ):
-            return False
+        """
+        Verifica se as colunas de índices e valores têm o mesmo comprimento e se não há valores NaN.
+
+        Args:
+            row (pd.Series): Linha do DataFrame a ser validada.
+
+        Returns:
+            bool: True se a linha for válida, False caso contrário.
+        """
+        pairs_to_check = [
+            ("Train_index", "Train_values"),
+            ("Actuals_index", "Actuals_values"),
+            ("Preds_index", "Preds_values"),
+        ]
+
+        for index_col, value_col in pairs_to_check:
+            if len(row[index_col]) != len(row[value_col]):
+                return False
+            if pd.isnull(row[index_col]).any() or pd.isnull(row[value_col]).any():
+                return False
+
         return True
 
-    def get_frequency_or_default(time_idx, default_freq):
-        """Tenta inferir a frequência de 'Time_Index'. Se não conseguir, retorna a frequência padrão."""
-        if len(time_idx) < 3:
-            return default_freq
-        inferred_freq = pd.infer_freq(time_idx)
-        return inferred_freq if inferred_freq else default_freq
+    def calculate_metrics(row):
+        """Calcula todas as métricas para uma linha do DataFrame."""
+        insample_idx = pd.DatetimeIndex(row["Train_index"])
+        actual_idx = pd.DatetimeIndex(row["Actuals_index"])
+        preds_idx = pd.DatetimeIndex(row["Preds_index"])
 
-    def calculate_mae(row):
-        time_idx = pd.DatetimeIndex(row["Time_Index"])
-        freq = get_frequency_or_default(time_idx, default_freq)
-        actual_ts = TimeSeries.from_times_and_values(
-            time_idx, row["Actuals"], freq=freq
+        # Criação das séries temporais
+        actual_ts = TimeSeries.from_times_and_values(actual_idx, row["Actuals_values"])
+        preds_ts = TimeSeries.from_times_and_values(preds_idx, row["Preds_values"])
+
+        # Série insample para o cálculo, se necessario.
+        insample_ts = TimeSeries.from_times_and_values(
+            insample_idx, row["Train_values"]
         )
-        pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
-        return mae(actual_series=actual_ts, pred_series=pred_ts)
 
-    def calculate_rmse(row):
-        time_idx = pd.DatetimeIndex(row["Time_Index"])
-        freq = get_frequency_or_default(time_idx, default_freq)
-        actual_ts = TimeSeries.from_times_and_values(
-            time_idx, row["Actuals"], freq=freq
+        # Cálculo das métricas
+        mae_val = mae(actual_series=actual_ts, pred_series=preds_ts)
+        rmse_val = rmse(actual_series=actual_ts, pred_series=preds_ts)
+        mse_val = mse(actual_series=actual_ts, pred_series=preds_ts)
+        actual_range = row["Actuals_values"].max() - row["Actuals_values"].min()
+        actual_variance = row["Actuals_values"].var()
+        nrmse_val = rmse_val / actual_range if actual_range != 0 else float("nan")
+        nmse_val = mse_val / actual_variance if actual_variance != 0 else float("nan")
+
+        return pd.Series(
+            {
+                "MAE": mae_val,
+                "RMSE": rmse_val,
+                "MSE": mse_val,
+                "NRMSE": nrmse_val,
+                "NMSE": nmse_val,
+            }
         )
-        pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
-        return rmse(actual_series=actual_ts, pred_series=pred_ts)
 
-    def calculate_mse(row):
-        time_idx = pd.DatetimeIndex(row["Time_Index"])
-        freq = get_frequency_or_default(time_idx, default_freq)
-        actual_ts = TimeSeries.from_times_and_values(
-            time_idx, row["Actuals"], freq=freq
-        )
-        pred_ts = TimeSeries.from_times_and_values(time_idx, row["Preds"], freq=freq)
-        return mse(actual_series=actual_ts, pred_series=pred_ts)
-
-    def calculate_nrmse(row):
-        rmse_val = calculate_rmse(row)
-        actual_range = row["Actuals"].max() - row["Actuals"].min()
-        return rmse_val / actual_range if actual_range != 0 else float("nan")
-
-    def calculate_nmse(row):
-        mse_val = calculate_mse(row)
-        actual_variance = row["Actuals"].var()
-        return mse_val / actual_variance if actual_variance != 0 else float("nan")
-
-    # Filtrar linhas inválidas (com valores NaN ou desajustes de tamanho)
+    # Filtrar linhas inválidas
     valid_results = results[results.apply(validate_row, axis=1)].copy()
 
-    # Aplicando as funções de métrica a cada linha válida do DataFrame
-    valid_results["MAE"] = valid_results.apply(calculate_mae, axis=1)
-    valid_results["RMSE"] = valid_results.apply(calculate_rmse, axis=1)
-    valid_results["MSE"] = valid_results.apply(calculate_mse, axis=1)
-    valid_results["NRMSE"] = valid_results.apply(calculate_nrmse, axis=1)
-    valid_results["NMSE"] = valid_results.apply(calculate_nmse, axis=1)
+    # Aplicando as funções de métrica a cada linha válida
+    metrics = valid_results.apply(calculate_metrics, axis=1)
+    valid_results = pd.concat([valid_results, metrics], axis=1).reset_index(drop=True)
 
     return valid_results
 

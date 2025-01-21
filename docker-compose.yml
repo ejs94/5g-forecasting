@@ -8,6 +8,16 @@ services:
       - ./data:/app/data # Mount shared volume for the dataset
     command: python3 prepare_dataset.py # Runs preprocessing and stops
 
+  baseline-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    container_name: baseline_cpu
+    volumes:
+      - ./data:/app/data
+      - ./src:/app
+    command: python3 train_univariate_models_baseline.py
+
   univariate-cpu:
     build:
       context: .
@@ -18,15 +28,15 @@ services:
       - ./src:/app
     command: python3 train_univariate_models.py
 
-  multivariate-cpu:
+  univariate-no-window-cpu:
     build:
       context: .
       dockerfile: Dockerfile.cpu
-    container_name: multivariate_cpu
+    container_name: univariate_no_window_cpu
     volumes:
       - ./data:/app/data
       - ./src:/app
-    command: python3 train_multivariate.py
+    command: python3 train_models_no_sliding_window.py
 
   multivariate-gpu:
     build:
@@ -77,3 +87,10 @@ services:
     security_opt:
       - label=disable
     entrypoint: [ "nvidia-smi", "-L" ]
+
+  clean-data:
+    image: alpine:latest
+    container_name: clean_data
+    volumes:
+      - ./data:/data
+    command: sh -c "rm -rf /data/results/no_window/results" # Comando para excluir tudo dentro da pasta /data

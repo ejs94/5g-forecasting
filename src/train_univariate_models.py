@@ -96,38 +96,38 @@ print("---Configurando os modelos Baselines---")
 # Todos os modelos configurados neste script serão tratados como univariados.
 # Isso significa que cada métrica alvo será prevista individualmente, sem considerar dependências entre diferentes métricas.
 baseline_models = {
-    # "Naive": NaiveSeasonal(K=1),
-    # "NaiveDrift": NaiveDrift(),
-    # "NaiveMovingAverage": NaiveMovingAverage(input_chunk_length=config["K"]),
-    # "NaiveMean": NaiveMean(),
-    # "ExponentialSmoothing": ExponentialSmoothing(seasonal=None),
-    # "LinearRegression": LinearRegressionModel(lags=1),
-    # "AutoARIMA": AutoARIMA(
-    #     start_p=1,  # Ordem inicial para o componente AR (Auto-Regressivo)
-    #     start_q=1,  # Ordem inicial para o componente MA (Média Móvel)
-    #     d=None,  # Deixa o AutoARIMA determinar automaticamente o grau de diferenciação
-    #     seasonal=False,  # Não considera a sazonalidade nos dados
-    #     start_P=0,  # Ordem inicial para o componente sazonal AR (não utilizado, pois seasonal=False)
-    #     start_Q=0,  # Ordem inicial para o componente sazonal MA (não utilizado, pois seasonal=False)
-    #     max_order=10,  # Limita a soma de (p + q + P + Q) para reduzir complexidade
-    #     stepwise=True,  # Usa abordagem de busca em passos para otimização (mais rápido)
-    #     error_action="ignore",  # Ignora erros ao tentar ajustar certos modelos
-    #     suppress_warnings=True,  # Suprime os warnings durante o ajuste
-    #     test="adf",  # Teste de estacionaridade a ser usado (ADF é uma boa escolha padrão)
-    #     seasonal_test="ocsb",  # Teste de sazonalidade (não será usado, pois seasonal=False)
-    #     max_p=3,  # Limite superior para a ordem AR
-    #     max_q=3,  # Limite superior para a ordem MA
-    #     max_P=0,  # Não há componente sazonal AR (max_P=0)
-    #     max_Q=0,  # Não há componente sazonal MA (max_Q=0)
-    #     max_d=2,  # Máximo grau de diferenciação
-    #     max_D=0,  # Não há sazonalidade, então max_D=0
-    #     trace=True,  # Mostra o progresso do ajuste para depuração
-    #     n_jobs=-1,  # Permite paralelismo para acelerar o ajuste (usa todos os núcleos disponíveis)
-    #     random_state=42,  # Para reprodutibilidade
-    # ),
-    # "Theta": Theta(theta=1.0),
-    # "FFT": FFT(),
-    # "Prophet": Prophet(),
+    "Naive": NaiveSeasonal(K=1),
+    "NaiveDrift": NaiveDrift(),
+    "NaiveMovingAverage": NaiveMovingAverage(input_chunk_length=config["K"]),
+    "NaiveMean": NaiveMean(),
+    "ExponentialSmoothing": ExponentialSmoothing(seasonal=None),
+    "LinearRegression": LinearRegressionModel(lags=1),
+    "AutoARIMA": AutoARIMA(
+        start_p=1,  # Ordem inicial para o componente AR (Auto-Regressivo)
+        start_q=1,  # Ordem inicial para o componente MA (Média Móvel)
+        d=None,  # Deixa o AutoARIMA determinar automaticamente o grau de diferenciação
+        seasonal=False,  # Não considera a sazonalidade nos dados
+        start_P=0,  # Ordem inicial para o componente sazonal AR (não utilizado, pois seasonal=False)
+        start_Q=0,  # Ordem inicial para o componente sazonal MA (não utilizado, pois seasonal=False)
+        max_order=10,  # Limita a soma de (p + q + P + Q) para reduzir complexidade
+        stepwise=True,  # Usa abordagem de busca em passos para otimização (mais rápido)
+        error_action="ignore",  # Ignora erros ao tentar ajustar certos modelos
+        suppress_warnings=True,  # Suprime os warnings durante o ajuste
+        test="adf",  # Teste de estacionaridade a ser usado (ADF é uma boa escolha padrão)
+        seasonal_test="ocsb",  # Teste de sazonalidade (não será usado, pois seasonal=False)
+        max_p=3,  # Limite superior para a ordem AR
+        max_q=3,  # Limite superior para a ordem MA
+        max_P=0,  # Não há componente sazonal AR (max_P=0)
+        max_Q=0,  # Não há componente sazonal MA (max_Q=0)
+        max_d=2,  # Máximo grau de diferenciação
+        max_D=0,  # Não há sazonalidade, então max_D=0
+        trace=True,  # Mostra o progresso do ajuste para depuração
+        n_jobs=-1,  # Permite paralelismo para acelerar o ajuste (usa todos os núcleos disponíveis)
+        random_state=42,  # Para reprodutibilidade
+    ),
+    "Theta": Theta(theta=1.0),
+    "FFT": FFT(),
+    "Prophet": Prophet(),
 }
 
 print("---Configurando os modelos Machine Learning---")

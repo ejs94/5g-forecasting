@@ -71,6 +71,96 @@ list_driving_strm = df_driving.query("User_Activity == 'Streaming Video'")
 list_static_down = df_static.query("User_Activity == 'Downloading a File'")
 list_driving_down = df_driving.query("User_Activity == 'Downloading a File'")
 
+
+# ---
+# Gera Conjuntos de Dados com abordagem de redução em formato pandas
+# Definir o caminho da pasta de saída comum para todas as métricas
+reduced_output_dir = os.path.join(data_path, "reduced_metrics_datasets")
+
+if os.path.exists(reduced_output_dir):
+    shutil.rmtree(reduced_output_dir)
+    print(f"Pasta {reduced_output_dir} deletada.")
+
+os.makedirs(reduced_output_dir, exist_ok=True)
+
+
+def group_metrics_by_uid(df: pd.DataFrame, freq: str = "s") -> pd.DataFrame:
+    """
+    Agrupa métricas em listas agrupadas por Uid, com suporte para ajuste de frequência temporal.
+
+    Args:
+        df (pd.DataFrame): DataFrame original contendo os dados.
+        metrics (list): Lista de métricas (colunas) a serem agrupadas em listas.
+        freq (str): Frequência para ajuste temporal com `asfreq`. Padrão é "s" (segundos).
+
+    Returns:
+        pd.DataFrame: DataFrame reduzido com as métricas agregadas em listas por Uid.
+    """
+    # Ajustar a frequência do índice temporal
+    df = df.asfreq(freq=freq)
+
+    # Resetar o índice para incluir o Timestamp como coluna
+    df = df.reset_index()
+
+    # Agrupar por Uid e agregar métricas em listas
+    metrics_to_reduce = ["Timestamp", "RSRP", "RSRQ", "SNR", "CQI", "RSSI"]
+    reduced_df = (
+        df.groupby("Uid")
+        .agg({metric: list for metric in metrics_to_reduce})
+        .reset_index()
+    )
+
+    return reduced_df
+
+
+def save_grouped_metrics_to_pickle(
+    df: pd.DataFrame, activity_name: str, freq: str = "s"
+) -> None:
+    """
+    Agrupa as métricas por Uid e salva o resultado em arquivos pickle em uma pasta comum para todas as métricas.
+
+    Args:
+        df (pd.DataFrame): DataFrame contendo os dados.
+        activity_name (str): Nome da atividade (Streaming ou Downloading).
+        freq (str): Frequência para ajuste temporal com `asfreq`. Padrão é "s" (segundos).
+    """
+    # Ajustar a frequência do índice temporal
+    df = df.asfreq(freq=freq)
+
+    # Resetar o índice para incluir o Timestamp como coluna
+    df = df.reset_index()
+
+    # Agrupar por Uid e agregar métricas em listas
+    metrics_to_reduce = ["Timestamp", "RSRP", "RSRQ", "SNR", "CQI", "RSSI"]
+    reduced_df = (
+        df.groupby("Uid")
+        .agg({metric: list for metric in metrics_to_reduce})
+        .reset_index()
+    )
+
+    # Caminho do arquivo pickle para salvar o DataFrame
+    pickle_file_path = os.path.join(reduced_output_dir, f"{activity_name}_metrics.pkl")
+
+    # Salvar o DataFrame em um arquivo pickle
+    with open(pickle_file_path, "wb") as f:
+        pickle.dump(reduced_df, f)
+
+    print(f"Arquivo pickle salvo em: {pickle_file_path}")
+
+
+# Exemplo de como salvar os DataFrames de Streaming e Downloading
+print("---Criando datasets com as métricas reduzidas---")
+# Salvar os DataFrames de Streaming
+save_grouped_metrics_to_pickle(list_static_strm, "static_strm")
+save_grouped_metrics_to_pickle(list_driving_strm, "driving_strm")
+
+# Salvar os DataFrames de Downloading
+save_grouped_metrics_to_pickle(list_static_down, "static_down")
+save_grouped_metrics_to_pickle(list_driving_down, "driving_down")
+
+
+# ---
+# Gera Conjunto de dados em janelas em formato timeseries
 # Separando os conjuntos por UID único
 print("---Separando os conjuntos por UID único---")
 list_static_strm = separate_by_uid_and_frequency(

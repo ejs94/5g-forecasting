@@ -9,7 +9,7 @@ from darts import TimeSeries
 from darts.dataprocessing import Pipeline
 from darts.dataprocessing.transformers import MissingValuesFiller, Scaler
 
-from metrics import collect_univariate_metrics, evaluate_global_model
+from metrics import evaluate_global_model
 
 
 def extract_5G_dataset(path: os.path) -> list[pd.DataFrame]:
@@ -195,66 +195,6 @@ def convert_dfs_to_ts(
         list_df[i] = TimeSeries.from_dataframe(df, value_cols=target_columns)
 
     return list_df
-
-
-def training_model_for_activity(
-    activity: str,
-    model_name: str,
-    model,
-    list_series,
-    target_columns,
-    output_file: str,
-    K: int,
-    H: int,
-) -> bool:
-    """
-    Trains a univariate model for a specific activity and indicates whether the operation was successful.
-
-    Args:
-        activity (str): Name of the activity to be evaluated.
-        model_name (str): Name of the model to be used.
-        model: The forecasting model to be applied.
-        list_series (list): List of time series for the activity.
-        target_columns (list): KPI columns to be evaluated.
-        output_file (str): Name of the output file (without extension).
-        K (int): Number of subsets for cross-validation.
-        H (int): Forecast horizon.
-
-    Returns:
-        bool: True if the operation was successful, False otherwise.
-    """
-
-    print(f"---{model_name} Forecast---")
-
-    try:
-        # Collect univariate metrics
-        result = collect_univariate_metrics(
-            activity, list_series, target_columns, model_name, model, K, H
-        )
-
-        if result is None:
-            print(f"Warning: Result for {activity} using {model_name} is None.")
-            return False  # Indicate failure if result is None
-
-        # Define the path to save the file, adding the .parquet extension
-        output_path = os.path.join(
-            os.curdir, "data", "results", f"{output_file}.parquet"
-        )
-
-        # Create the directory if it doesn't exist
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-        # Save the DataFrame in Parquet format
-        result_record = pd.DataFrame(result)
-        result_record.to_parquet(output_path, compression="gzip")
-
-        print(f"Saved in {output_path}")
-
-        return True  # Indicate success
-
-    except Exception as e:
-        print(f"Error processing activity '{activity}' with model '{model_name}': {e}")
-        return False  # Indicate failure in case of an exception
 
 
 def train_and_evaluate_global_model(

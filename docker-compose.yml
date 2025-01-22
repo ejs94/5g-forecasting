@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.preprocess
-    container_name: preprocess_datasets
     volumes:
       - ./data:/app/data # Mount shared volume for the dataset
     command: python3 prepare_dataset.py # Runs preprocessing and stops
@@ -12,7 +11,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cpu
-    container_name: baseline_cpu
     volumes:
       - ./data:/app/data
       - ./src:/app
@@ -22,7 +20,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cpu
-    container_name: univariate_cpu
     volumes:
       - ./data:/app/data
       - ./src:/app
@@ -32,17 +29,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cpu
-    container_name: univariate_no_window_cpu
     volumes:
       - ./data:/app/data
       - ./src:/app
     command: python3 train_models_no_sliding_window.py
 
+  lstm-no-window-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    volumes:
+      - ./data:/app/data
+      - ./src:/app
+    command: python3 train_models_no_sliding_window.py --column RSRQ
+
   multivariate-gpu:
     build:
       context: .
       dockerfile: Dockerfile.gpu
-    container_name: multivariate_gpu
     runtime: nvidia # Ativa o suporte a GPU sem precisar de deploy.resources
     environment:
       - NVIDIA_VISIBLE_DEVICES=all # Configura a visibilidade de todas as GPUs
@@ -56,7 +60,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.jupyterlab
-    container_name: jupyterlab_container
     ports:
       - "8888:8888" # Porta para acesso externo
     volumes:
@@ -90,7 +93,6 @@ services:
 
   clean-data:
     image: alpine:latest
-    container_name: clean_data
     volumes:
       - ./data:/data
-    command: sh -c "rm -rf /data/results/no_window/results" # Comando para excluir tudo dentro da pasta /data
+    command: sh -c "rm -rf /data/results/no_window/*" # Comando para excluir tudo dentro da pasta /data

@@ -134,19 +134,19 @@ print("---Configurando os modelos Machine Learning---")
 # Todos os modelos configurados neste script serão tratados como univariados.
 # Isso significa que cada métrica alvo será prevista individualmente, sem considerar dependências entre diferentes métricas.
 dl_models = {
-    # "NBEATS": NBEATSModel(
-    #     input_chunk_length=config["K"],
-    #     output_chunk_length=config["H"],
-    #     generic_architecture=True,
-    #     num_stacks=10,
-    #     num_blocks=1,
-    #     num_layers=4,
-    #     layer_widths=512,
-    #     n_epochs=100,
-    #     nr_epochs_val_period=1,
-    #     batch_size=64,  # Considerando ajustar para um valor menor, como 64
-    #     random_state=None,
-    # ),
+    "NBEATS": NBEATSModel(
+        input_chunk_length=config["K"],
+        output_chunk_length=config["H"],
+        generic_architecture=True,
+        num_stacks=10,
+        num_blocks=1,
+        num_layers=4,
+        layer_widths=512,
+        n_epochs=100,
+        nr_epochs_val_period=1,
+        batch_size=64,
+        random_state=None,
+    ),
     "LSTM": RNNModel(
         model="LSTM",
         input_chunk_length=3 * config["H"],

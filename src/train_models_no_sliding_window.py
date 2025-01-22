@@ -1,3 +1,4 @@
+import argparse
 import gc
 import json
 import multiprocessing
@@ -11,13 +12,14 @@ import pandas as pd
 import torch
 from darts import TimeSeries, concatenate
 from darts.dataprocessing import Pipeline
-from darts.dataprocessing.transformers import MissingValuesFiller, Scaler
+from darts.dataprocessing.transformers import Scaler
 from darts.models import (
     NaiveDrift,
     NaiveMean,
     NaiveMovingAverage,
     NaiveSeasonal,
     NBEATSModel,
+    RNNModel,
 )
 from darts.utils.missing_values import (
     extract_subseries,
@@ -35,12 +37,8 @@ if torch.cuda.is_available():
 else:
     print("A GPU NÃO está disponível. Rodando na CPU.")
 
-# Caminhos
-config_path = os.path.join(os.curdir, "config.json")
-data_path = os.path.join(os.curdir, "data")
-reduced_metrics_path = os.path.join(data_path, "reduced_metrics_datasets")
-
 print("---Verificando a Configuração---")
+config_path = os.path.join(os.curdir, "config.json")
 # Verifica se o arquivo de configuração já existe; caso contrário, cria um
 if not os.path.exists(config_path):
     config = {
@@ -61,6 +59,7 @@ print("---Configuração Utilizada---")
 print(config)
 
 print("---Carregando os dados preprocessados---")
+reduced_metrics_path = os.path.join(os.curdir, "data", "reduced_metrics_datasets")
 activities = ["static_down", "static_strm", "driving_down", "driving_strm"]
 
 # Carregar os dados preprocessados para cada atividade
@@ -96,18 +95,16 @@ torch.set_num_interop_threads(num_threads)
 
 print(f"Configurando PyTorch para usar {num_threads} threads.")
 dl_models = {
-    "NBEATS": NBEATSModel(
+    "LSTM": RNNModel(
+        model="LSTM",
         input_chunk_length=config["K"],
         output_chunk_length=config["H"],
-        generic_architecture=True,
-        num_stacks=10,
-        num_blocks=1,
-        num_layers=4,
-        layer_widths=512,
-        n_epochs=100,
-        nr_epochs_val_period=1,
+        training_length=config["K"],
+        hidden_dim=50,
+        n_rnn_layers=4,
+        dropout=0.0,
         batch_size=64,
-        random_state=None,
+        n_epochs=100,
     ),
 }
 
@@ -157,141 +154,165 @@ def train_process_timeseries(row, column_name, horizon=10):
     return subseries
 
 
-def train_and_evaluate_models(models, time_series_dict, config, data_path):
-    print("---Iniciando o treinamento dos modelos---")
-    no_window_results_path = os.path.join(data_path, "results", "no_window")
-    os.makedirs(no_window_results_path, exist_ok=True)
+def save_results(
+    result_records, no_window_results_path, model_name, activity, column_name
+):
+    """Save results to a Parquet file."""
+    if result_records:
+        result_record = pd.concat(result_records)
+        output_file = os.path.join(
+            no_window_results_path, f"{model_name}_{activity}_{column_name}.parquet"
+        )
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        result_record.to_parquet(output_file, compression="gzip")
+        tqdm.write(f"[SUCCESS] Results for {activity} saved at: {output_file}")
+    else:
+        tqdm.write(
+            f"[WARNING] No results for activity '{activity}' with model '{model_name}'"
+        )
 
-    scaler = Scaler()  # Escalona os dados
+
+def train_and_evaluate_models(models, time_series_dict, config, output_path):
+    horizon = config["H"]
+    scaler = Scaler()
     pipe = Pipeline([scaler])
 
-    start_time = time.time()
-
-    for model_name, model in tqdm(models.items(), desc="Treinando Modelos"):
-        result_records = []
+    for model_name, model in tqdm(models.items(), desc="Training Models"):
         for activity, pd_series in tqdm(
-            time_series_dict.items(), desc=f"Atividade ({model_name})", leave=False
+            time_series_dict.items(), desc=f"Activity ({model_name})", leave=False
         ):
-            for column_name in config[
-                "target_columns"
-            ]:  # Iterar pelas colunas de métricas
-                print(
-                    f"Processando métrica {column_name} para {activity} com {model_name}..."
-                )
-
+            for column_name in config["target_columns"]:
+                evaluation_results = []
+                # Processa todas as séries que serão treinadas e remove valores inválidos.
                 processed_series = []
                 for idx, row in pd_series.iterrows():
-                    # Processar a série para a métrica atual
                     subseries = train_process_timeseries(
                         row, column_name, horizon=config["H"]
                     )
                     if subseries:
                         processed_series.extend(subseries)
 
-                if processed_series:
-                    print(
-                        f"Iniciando treinamento para {column_name} em {activity} com {model_name}..."
+                # Vai para proxima métrica caso não haja séries temporais.
+                if not processed_series:
+                    continue
+
+                # Treina toda as séries para aquela métrica e modelo.
+                for series in tqdm(
+                    processed_series,
+                    desc=f"Training Series {idx}: {column_name} ({model_name})",
+                    leave=False,
+                ):
+                    # Start time for training this series
+                    start_time = time.time()
+
+                    # Train the model with processed series
+                    train_data = series[:-horizon]
+                    test_horizon = series[-horizon:]
+
+                    ts_transformed = pipe.fit_transform(train_data)
+
+                    model.fit(ts_transformed)
+
+                    y_pred = model.predict(len(test_horizon))
+
+                    # Calculate elapsed time for training this series
+                    elapsed_time = time.time() - start_time
+
+                    # Save the trained model
+                    model_dir = os.path.join(
+                        output_path, "models", activity, column_name
+                    )
+                    os.makedirs(model_dir, exist_ok=True)
+                    model.save(os.path.join(model_dir, f"lst_{model_name}_model.pkl"))
+
+                    # Append results to the temporary record list
+                    evaluation_results.append(
+                        pd.DataFrame(
+                            {
+                                "target": column_name,
+                                "Activity": activity,
+                                "Model": model_name,
+                                "Elapsed_time": [elapsed_time],
+                                "Train_index": [
+                                    pipe.inverse_transform(ts_transformed, partial=True)
+                                    .pd_dataframe()
+                                    .index.to_numpy()
+                                ],
+                                "Train_values": [
+                                    pipe.inverse_transform(ts_transformed, partial=True)
+                                    .pd_dataframe()
+                                    .values.flatten()
+                                ],
+                                "Actuals_index": [
+                                    test_horizon.pd_dataframe().index.to_numpy()
+                                ],
+                                "Actuals_values": [
+                                    test_horizon.pd_dataframe().values.flatten()
+                                ],
+                                "Preds_index": [
+                                    pipe.inverse_transform(y_pred, partial=True)
+                                    .pd_dataframe()
+                                    .index.to_numpy()
+                                ],
+                                "Preds_values": [
+                                    pipe.inverse_transform(y_pred, partial=True)
+                                    .pd_dataframe()
+                                    .values.flatten()
+                                ],
+                            }
+                        )
                     )
 
-                    horizon = config["H"]
-
-                    for series in tqdm(
-                        processed_series,
-                        desc=f"Treinando Série {idx}: {column_name} ({model_name})",
-                        leave=False,
-                    ):
-                        # Ajustar o modelo com as séries processadas
-                        train_data = series[:-horizon]
-                        test_horizon = series[-horizon:]
-
-                        ts_transformed = pipe.fit_transform(train_data)
-
-                        model.fit(ts_transformed)
-                        print(
-                            f"Treinamento concluído para {column_name} em {activity} com {model_name}."
-                        )
-
-                        y_pred = model.predict(len(test_horizon))
-
-                        # Salvar o modelo treinado
-                        model_dir = os.path.join(
-                            no_window_results_path, "models", activity, column_name
-                        )
-                        os.makedirs(model_dir, exist_ok=True)
-                        model.save(
-                            os.path.join(model_dir, f"lst_{model_name}_model.pkl")
-                        )
-
-                        # Salvar os resultados em result_records
-                        result_records.append(
-                            pd.DataFrame(
-                                {
-                                    "target": column_name,
-                                    "Activity": activity,
-                                    "Model": model_name,
-                                    "Train_index": [
-                                        pipe.inverse_transform(
-                                            ts_transformed, partial=True
-                                        )
-                                        .pd_dataframe()
-                                        .index.to_numpy()
-                                    ],
-                                    "Train_values": [
-                                        pipe.inverse_transform(
-                                            ts_transformed, partial=True
-                                        )
-                                        .pd_dataframe()
-                                        .values.flatten()
-                                    ],
-                                    "Actuals_index": [
-                                        test_horizon.pd_dataframe().index.to_numpy()
-                                    ],
-                                    "Actuals_values": [
-                                        test_horizon.pd_dataframe().values.flatten()
-                                    ],
-                                    "Preds_index": [
-                                        pipe.inverse_transform(y_pred, partial=True)
-                                        .pd_dataframe()
-                                        .index.to_numpy()
-                                    ],
-                                    "Preds_values": [
-                                        pipe.inverse_transform(y_pred, partial=True)
-                                        .pd_dataframe()
-                                        .values.flatten()
-                                    ],
-                                }
-                            )
-                        )
-
-            # Salvar os resultados da atividade em arquivos .parquet
-            if result_records:
-                result_record = pd.concat(result_records)
-                output_file = os.path.join(
-                    no_window_results_path, f"{model_name}_{activity}.parquet"
-                )
-                os.makedirs(os.path.dirname(output_file), exist_ok=True)
-                result_record.to_parquet(output_file, compression="gzip")
-                tqdm.write(
-                    f"[SUCESSO] Resultados de {activity} salvos em: {output_file}"
-                )
-            else:
-                tqdm.write(
-                    f"[AVISO] Nenhum resultado para a atividade '{activity}' com o modelo '{model_name}'"
+                # Save activity-specific results and go to next metrics
+                save_results(
+                    evaluation_results,
+                    output_path,
+                    model_name,
+                    activity,
+                    column_name,
                 )
 
-            # Liberar memória ao final de cada modelo
-            del result_records, result_record
-            gc.collect()
+                # Clear memory after processing each activity
+                del evaluation_results
+                gc.collect()
 
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"Tempo total de execução: {elapsed_time:.2f} segundos.")
+    tqdm.write("---Training complete---")
 
 
-print("---Treinando os modelos---")
+if __name__ == "__main__":
+    # Configuração do argparse
+    parser = argparse.ArgumentParser(
+        description="Treinamento de modelos para séries temporais."
+    )
+    parser.add_argument(
+        "--column",
+        type=str,
+        help="Nome da coluna a ser treinada. Se não for especificado, todas as colunas serão usadas.",
+    )
+    args = parser.parse_args()
 
-# Treinando os modelos de baseline
-train_and_evaluate_models(baseline_models, time_series_dict, config, data_path)
+    # Atualiza a configuração com a coluna específica, se fornecida
+    if args.column:
+        if args.column in config["target_columns"]:
+            config["target_columns"] = [args.column]
+        else:
+            print(
+                f"[ERRO] A coluna '{args.column}' não está na lista de colunas disponíveis: {config['target_columns']}"
+            )
+            exit(1)
 
-# Treinando os modelos de machine learning (ML)
-train_and_evaluate_models(dl_models, time_series_dict, config, data_path)
+    print("---Configuração Atualizada---")
+    print(config)
+
+    no_window_results_path = os.path.join(os.curdir, "data", "results", "no_window")
+    os.makedirs(no_window_results_path, exist_ok=True)
+
+    # Treinando os modelos de baseline
+    train_and_evaluate_models(
+        baseline_models, time_series_dict, config, no_window_results_path
+    )
+
+    # Treinando os modelos de machine learning (ML)
+    train_and_evaluate_models(
+        dl_models, time_series_dict, config, no_window_results_path
+    )

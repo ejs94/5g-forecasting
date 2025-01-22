@@ -24,4 +24,4 @@ RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.gpu.
 COPY ./src /app
 
 # Define o comando padrão ao iniciar o contêiner
-CMD ["python3", "train_multivariate.py"]
+CMD ["python3", "train_models_no_sliding_window.py"]

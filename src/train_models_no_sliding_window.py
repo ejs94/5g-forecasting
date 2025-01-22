@@ -38,6 +38,7 @@ if torch.cuda.is_available():
     num_threads = multiprocessing.cpu_count()
     torch.set_num_threads(num_threads)
     torch.set_num_interop_threads(num_threads)
+    print(f"Configurando PyTorch para usar {num_threads} threads.")
 
     print("A GPU está disponível.")
     def generate_torch_kwargs():
@@ -108,8 +109,6 @@ baseline_models = {
 }
 
 print("---Configurando os modelos Machine Learning---")
-
-print(f"Configurando PyTorch para usar {num_threads} threads.")
 dl_models = {
     "LSTM": RNNModel(
         model="LSTM",

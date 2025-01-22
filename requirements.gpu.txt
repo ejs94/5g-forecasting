@@ -5,3 +5,5 @@ torchaudio
 numpy
 pandas
 shortuuid
+prophet
+lightgbm

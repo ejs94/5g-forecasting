@@ -33,9 +33,31 @@ warnings.filterwarnings("ignore")
 print("---Verificando se há GPU---")
 # Verifica se a GPU está disponível
 if torch.cuda.is_available():
+    # Número total de threads disponíveis
+    # Configura o número de threads
+    num_threads = multiprocessing.cpu_count()
+    torch.set_num_threads(num_threads)
+    torch.set_num_interop_threads(num_threads)
+
     print("A GPU está disponível.")
+    def generate_torch_kwargs():
+        # run torch models on CPU, and disable progress bars for all model stages except training.
+        return {
+            "pl_trainer_kwargs": {
+                "accelerator": "gpu",
+                "devices": [0]
+            }
+        }
 else:
     print("A GPU NÃO está disponível. Rodando na CPU.")
+    def generate_torch_kwargs():
+        # run torch models on CPU, and disable progress bars for all model stages except training.
+        return {
+            "pl_trainer_kwargs": {
+                "accelerator": "cpu",
+            }
+        }
+
 
 print("---Verificando a Configuração---")
 config_path = os.path.join(os.curdir, "config.json")
@@ -87,12 +109,6 @@ baseline_models = {
 
 print("---Configurando os modelos Machine Learning---")
 
-# Número total de threads disponíveis
-# Configura o número de threads
-num_threads = multiprocessing.cpu_count()
-torch.set_num_threads(num_threads)
-torch.set_num_interop_threads(num_threads)
-
 print(f"Configurando PyTorch para usar {num_threads} threads.")
 dl_models = {
     "LSTM": RNNModel(
@@ -105,6 +121,7 @@ dl_models = {
         dropout=0.0,
         batch_size=64,
         n_epochs=100,
+        **generate_torch_kwargs(),
     ),
 }
 

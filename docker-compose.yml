@@ -43,7 +43,7 @@ services:
       - ./src:/app
     command: python3 train_models_no_sliding_window.py --column RSRQ
 
-  multivariate-gpu:
+  no-window-gpu:
     build:
       context: .
       dockerfile: Dockerfile.gpu
@@ -54,7 +54,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./src:/app
-    command: python3 train_multivariate.py
+    command: python3 train_models_no_sliding_window.py
 
   jupyterlab:
     build:

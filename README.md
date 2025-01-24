@@ -36,7 +36,7 @@ docker build -t darts_gpu_image -f Dockerfile.gpu .
 
 Running:
 ```bash
-docker run --rm --gpus all --name darts_gpu_container -v %cd%/data:/app/data -v %cd%/src:/app -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=compute,utility darts_gpu_image python3 train_multivariate.py
+docker run --rm --gpus all -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=compute,utility -v $(pwd)/data:/app/data -v $(pwd)/src:/app darts_gpu_image python3 train_models_no_sliding_window.py
 ```
 
 ---

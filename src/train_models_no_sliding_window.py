@@ -34,6 +34,7 @@ from darts.utils.missing_values import (
     missing_values_ratio,
 )
 from tqdm.auto import tqdm
+from darts.utils.utils import SeasonalityMode
 
 warnings.filterwarnings("ignore")
 
@@ -126,7 +127,7 @@ baseline_models = {
         random_state=42,  # Para garantir a reprodutibilidade (opcional)
         add_encoders=None,  # Não adicionar codificadores (opcional)
     ),
-    "Theta": Theta(theta=1.0),
+    "Theta": Theta(theta=1.0, season_mode=SeasonalityMode.NONE),
     "FFT": FFT(),
     "Prophet": Prophet(),
 }

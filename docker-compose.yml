@@ -7,7 +7,7 @@ services:
       - ./data:/app/data # Mount shared volume for the dataset
     command: python3 prepare_dataset.py # Runs preprocessing and stops
 
-  baseline-cpu:
+  baseline-sliding-window-cpu:
     build:
       context: .
       dockerfile: Dockerfile.cpu
@@ -16,7 +16,7 @@ services:
       - ./src:/app
     command: python3 train_univariate_models_baseline.py
 
-  univariate-cpu:
+  all-models-sliding-window-cpu:
     build:
       context: .
       dockerfile: Dockerfile.cpu
@@ -25,25 +25,16 @@ services:
       - ./src:/app
     command: python3 train_univariate_models.py
 
-  univariate-no-window-cpu:
+  baseline-no-window-cpu:
     build:
       context: .
       dockerfile: Dockerfile.cpu
     volumes:
       - ./data:/app/data
       - ./src:/app
-    command: python3 train_models_no_sliding_window.py
+    command: python3 train_models_no_sliding_window.py --models baseline
 
-  lstm-no-window-cpu:
-    build:
-      context: .
-      dockerfile: Dockerfile.cpu
-    volumes:
-      - ./data:/app/data
-      - ./src:/app
-    command: python3 train_models_no_sliding_window.py --column RSRQ
-
-  no-window-gpu:
+  dl-no-window-gpu:
     build:
       context: .
       dockerfile: Dockerfile.gpu
@@ -54,7 +45,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./src:/app
-    command: python3 train_models_no_sliding_window.py
+    command: python3 train_models_no_sliding_window.py --models deep_learning
 
   jupyterlab:
     build:
@@ -91,8 +82,8 @@ services:
       - label=disable
     entrypoint: [ "nvidia-smi", "-L" ]
 
-  clean-data:
+  clean-results-data:
     image: alpine:latest
     volumes:
       - ./data:/data
-    command: sh -c "rm -rf /data/results/no_window/*" # Comando para excluir tudo dentro da pasta /data
+    command: sh -c "rm -rf /data/results/*" # Comando para excluir tudo dentro da pasta /data

@@ -101,7 +101,7 @@ baseline_models = {
     "NaiveMovingAverage": NaiveMovingAverage(input_chunk_length=config["K"]),
     "NaiveMean": NaiveMean(),
     "ExponentialSmoothing": ExponentialSmoothing(seasonal=None),
-    "LinearRegression": LinearRegressionModel(lags=1),
+    "LinearRegression": LinearRegressionModel(lags=50),
     "AutoARIMA": AutoARIMA(
         start_p=1,  # Ordem inicial para o componente AR (Auto-Regressivo)
         start_q=1,  # Ordem inicial para o componente MA (Média Móvel)

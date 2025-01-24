@@ -14,12 +14,19 @@ from darts import TimeSeries, concatenate
 from darts.dataprocessing import Pipeline
 from darts.dataprocessing.transformers import Scaler
 from darts.models import (
+    ARIMA,
+    FFT,
+    ExponentialSmoothing,
+    LightGBMModel,
+    LinearRegressionModel,
     NaiveDrift,
     NaiveMean,
     NaiveMovingAverage,
     NaiveSeasonal,
     NBEATSModel,
+    Prophet,
     RNNModel,
+    Theta,
 )
 from darts.utils.missing_values import (
     extract_subseries,
@@ -41,16 +48,13 @@ if torch.cuda.is_available():
     print(f"Configurando PyTorch para usar {num_threads} threads.")
 
     print("A GPU está disponível.")
+
     def generate_torch_kwargs():
         # run torch models on CPU, and disable progress bars for all model stages except training.
-        return {
-            "pl_trainer_kwargs": {
-                "accelerator": "gpu",
-                "devices": [0]
-            }
-        }
+        return {"pl_trainer_kwargs": {"accelerator": "gpu", "devices": [0]}}
 else:
     print("A GPU NÃO está disponível. Rodando na CPU.")
+
     def generate_torch_kwargs():
         # run torch models on CPU, and disable progress bars for all model stages except training.
         return {
@@ -106,6 +110,25 @@ baseline_models = {
     "NaiveDrift": NaiveDrift(),
     "NaiveMovingAverage": NaiveMovingAverage(input_chunk_length=config["K"]),
     "NaiveMean": NaiveMean(),
+    "ExponentialSmoothing": ExponentialSmoothing(seasonal=None),
+    "LinearRegression": LinearRegressionModel(lags=50),
+    "ARIMA": ARIMA(
+        p=1,  # Ordem do autoregressivo (AR) - número de lags
+        d=1,  # Ordem de diferenciação (I) - número de diferenciações
+        q=1,  # Ordem do modelo de média móvel (MA) - tamanho da janela
+        seasonal_order=(
+            0,
+            0,
+            0,
+            0,
+        ),  # Não sazonal, sem componentes sazonais (P, D, Q, s)
+        trend="n",  # Sem tendência determinística (sem tendência)
+        random_state=42,  # Para garantir a reprodutibilidade (opcional)
+        add_encoders=None,  # Não adicionar codificadores (opcional)
+    ),
+    "Theta": Theta(theta=1.0),
+    "FFT": FFT(),
+    "Prophet": Prophet(),
 }
 
 print("---Configurando os modelos Machine Learning---")
@@ -118,6 +141,23 @@ dl_models = {
         hidden_dim=50,
         n_rnn_layers=4,
         dropout=0.0,
+        batch_size=64,
+        n_epochs=100,
+        **generate_torch_kwargs(),
+    ),
+    "LightGBM": LightGBMModel(
+        lags=config["K"],
+        output_chunk_length=config["H"],
+        **generate_torch_kwargs(),
+    ),
+    "NBEATS": NBEATSModel(
+        input_chunk_length=config["K"],
+        output_chunk_length=config["H"],
+        generic_architecture=True,
+        num_stacks=10,
+        num_blocks=1,
+        num_layers=4,
+        layer_widths=512,
         batch_size=64,
         n_epochs=100,
         **generate_torch_kwargs(),
@@ -305,6 +345,17 @@ if __name__ == "__main__":
         type=str,
         help="Nome da coluna a ser treinada. Se não for especificado, todas as colunas serão usadas.",
     )
+
+    # Argumento para selecionar os tipos de modelos a serem treinados
+    parser.add_argument(
+        "--models",
+        type=str,
+        choices=["baseline", "deep_learning"],
+        nargs="+",  # Permite múltiplas opções
+        required=True,
+        help="Tipos de modelos a serem treinados. Pode ser 'baseline', 'deep_learning', ou ambos.",
+    )
+
     args = parser.parse_args()
 
     # Atualiza a configuração com a coluna específica, se fornecida
@@ -323,12 +374,17 @@ if __name__ == "__main__":
     no_window_results_path = os.path.join(os.curdir, "data", "results", "no_window")
     os.makedirs(no_window_results_path, exist_ok=True)
 
-    # Treinando os modelos de baseline
-    train_and_evaluate_models(
-        baseline_models, time_series_dict, config, no_window_results_path
-    )
+    # Seleciona e treina os modelos com base na escolha do usuário
+    if "baseline" in args.models:
+        print("[INFO] Iniciando o treinamento dos modelos de baseline...")
+        train_and_evaluate_models(
+            baseline_models, time_series_dict, config, no_window_results_path
+        )
 
-    # Treinando os modelos de machine learning (ML)
-    train_and_evaluate_models(
-        dl_models, time_series_dict, config, no_window_results_path
-    )
+    if "deep_learning" in args.models:
+        print("[INFO] Iniciando o treinamento dos modelos de deep learning...")
+        train_and_evaluate_models(
+            dl_models, time_series_dict, config, no_window_results_path
+        )
+
+    print("[INFO] Treinamento concluído.")

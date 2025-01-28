@@ -263,6 +263,9 @@ def train_and_evaluate_models(models, time_series_dict, config, output_path):
         ):
             for column_name in config["target_columns"]:
                 evaluation_results = []
+                processed_count = 0  # Contador de séries processadas
+                discarded_count = 0  # Contador de séries descartadas
+
                 # Processa todas as séries que serão treinadas e remove valores inválidos.
                 processed_series = []
                 for idx, row in pd_series.iterrows():
@@ -271,9 +274,15 @@ def train_and_evaluate_models(models, time_series_dict, config, output_path):
                     )
                     if subseries:
                         processed_series.extend(subseries)
+                        processed_count += 1  # Incrementa o contador de processadas
+                    else:
+                        discarded_count += 1  # Incrementa o contador de descartadas
 
                 # Vai para proxima métrica caso não haja séries temporais.
                 if not processed_series:
+                    tqdm.write(
+                        f"[WARNING] No valid series for {activity}, {column_name}, {model_name}"
+                    )
                     continue
 
                 # Treina toda as séries para aquela métrica e modelo.
@@ -350,6 +359,8 @@ def train_and_evaluate_models(models, time_series_dict, config, output_path):
                     model_name,
                     activity,
                     column_name,
+                    processed_count,
+                    discarded_count,
                 )
 
                 # Clear memory after processing each activity

@@ -132,19 +132,18 @@ def sliding_window_cross_validate_and_evaluate(
     return results
 
 
-def compare_series_metrics(results: pd.DataFrame) -> pd.DataFrame:
+def compare_series_metrics(results: pd.DataFrame, n_jobs: int = -1) -> pd.DataFrame:
     """
-    Calcula as métricas MAE, RMSE, MSE, NRMSE, NMSE e RMSSE para cada linha do DataFrame `results`
-    comparando as séries temporais reais com as preditas. Se a frequência do 'Time_Index'
-    estiver ausente, usa um valor padrão especificado.
+    Calcula as métricas MAE, RMSE, MSE, NRMSE e NMSE para cada linha do DataFrame `results`
+    comparando as séries temporais reais com as preditas, utilizando `n_jobs` para paralelização.
 
     Args:
-        results (pd.DataFrame): DataFrame contendo as colunas "Actuals_index", "Actuals_values", "Preds_index"
-                                e "Preds_values", que representam as séries temporais reais e preditas.
+        results (pd.DataFrame): DataFrame contendo as colunas "Actuals_index", "Actuals_values",
+                                "Preds_index" e "Preds_values".
+        n_jobs (int): Número de processos paralelos para o cálculo. Default é -1 (usa todos os processadores disponíveis).
 
     Returns:
-        pd.DataFrame: DataFrame com as métricas calculadas adicionadas como novas
-        colunas ("MAE", "RMSE", "MSE", "NRMSE", "NMSE", "RMSSE").
+        pd.DataFrame: DataFrame com as métricas calculadas adicionadas como novas colunas ("MAE", "RMSE", "MSE", "NRMSE", "NMSE").
     """
     if results is None:
         raise ValueError("O parâmetro 'results' não pode ser None.")
@@ -177,7 +176,6 @@ def compare_series_metrics(results: pd.DataFrame) -> pd.DataFrame:
 
     def calculate_metrics(row):
         """Calcula todas as métricas para uma linha do DataFrame."""
-        insample_idx = pd.DatetimeIndex(row["Train_index"])
         actual_idx = pd.DatetimeIndex(row["Actuals_index"])
         preds_idx = pd.DatetimeIndex(row["Preds_index"])
 
@@ -185,36 +183,39 @@ def compare_series_metrics(results: pd.DataFrame) -> pd.DataFrame:
         actual_ts = TimeSeries.from_times_and_values(actual_idx, row["Actuals_values"])
         preds_ts = TimeSeries.from_times_and_values(preds_idx, row["Preds_values"])
 
-        # Série insample para o cálculo, se necessario.
-        insample_ts = TimeSeries.from_times_and_values(
-            insample_idx, row["Train_values"]
+        # Cálculo das métricas
+        mae_val = mae(
+            actual_series=actual_ts, pred_series=preds_ts, intersect=True, n_jobs=n_jobs
+        )
+        rmse_val = rmse(
+            actual_series=actual_ts, pred_series=preds_ts, intersect=True, n_jobs=n_jobs
+        )
+        mse_val = mse(
+            actual_series=actual_ts, pred_series=preds_ts, intersect=True, n_jobs=n_jobs
         )
 
-        # Cálculo das métricas
-        mae_val = mae(actual_series=actual_ts, pred_series=preds_ts)
-        rmse_val = rmse(actual_series=actual_ts, pred_series=preds_ts)
-        mse_val = mse(actual_series=actual_ts, pred_series=preds_ts)
+        # Normalizações para NRMSE e NMSE
         actual_range = row["Actuals_values"].max() - row["Actuals_values"].min()
         actual_variance = row["Actuals_values"].var()
         nrmse_val = rmse_val / actual_range if actual_range != 0 else float("nan")
         nmse_val = mse_val / actual_variance if actual_variance != 0 else float("nan")
 
-        return pd.Series(
-            {
-                "MAE": mae_val,
-                "RMSE": rmse_val,
-                "MSE": mse_val,
-                "NRMSE": nrmse_val,
-                "NMSE": nmse_val,
-            }
-        )
+        return {
+            "MAE": mae_val,
+            "RMSE": rmse_val,
+            "MSE": mse_val,
+            "NRMSE": nrmse_val,
+            "NMSE": nmse_val,
+        }
 
     # Filtrar linhas inválidas
     valid_results = results[results.apply(validate_row, axis=1)].copy()
 
-    # Aplicando as funções de métrica a cada linha válida
-    metrics = valid_results.apply(calculate_metrics, axis=1)
-    valid_results = pd.concat([valid_results, metrics], axis=1).reset_index(drop=True)
+    # Calcula métricas para todas as linhas válidas
+    metrics = valid_results.apply(calculate_metrics, axis=1, result_type="expand")
+
+    # Combina métricas ao DataFrame original
+    valid_results = pd.concat([valid_results.reset_index(drop=True), metrics], axis=1)
 
     return valid_results
 

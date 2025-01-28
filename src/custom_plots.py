@@ -102,6 +102,37 @@ def plot_bar_for_medians_by_target(df: pd.DataFrame) -> None:
     # List of metrics to be plotted
     metrics = ["MAE_Median", "RMSE_Median", "MSE_Median", "NRMSE_Median", "NMSE_Median"]
 
+    # Reorganized model order
+    full_model_order = [
+        # Baseline models
+        "Naive",
+        "NaiveDrift",
+        "NaiveMean",
+        "NaiveMovingAverage",
+        # Statistical methods
+        "ARIMA",
+        "ExponentialSmoothing",
+        "FFT",
+        "Prophet",
+        "Theta",
+        # Machine Learning models
+        "LightGBM",
+        "LinearRegression",
+        "LSTM",
+        "NBEATS",
+    ]
+
+    # Determine models present in the DataFrame
+    models_in_data = df["Model"].unique()
+    model_order = [model for model in full_model_order if model in models_in_data]
+
+    # Emit a warning for missing models
+    missing_models = set(full_model_order) - set(models_in_data)
+    if missing_models:
+        print(
+            f"[WARNING] The following models are missing in the DataFrame: {missing_models}"
+        )
+
     # Iterate over each unique target
     for target in targets:
         # Filtering data for the specific target
@@ -110,42 +141,45 @@ def plot_bar_for_medians_by_target(df: pd.DataFrame) -> None:
         # Iterate over each metric
         for metric in metrics:
             # Creating a figure with two subplots (static and driving)
-            fig, axes = plt.subplots(1, 2, sharex=False)
+            fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
 
             # Filter and sort data for static activities
             static_data = target_data[target_data["Activity"].str.contains("static")]
-            static_data_sorted = static_data.sort_values(by=metric, ascending=True)
             sns.barplot(
-                data=static_data_sorted,
+                data=static_data,
                 x="Activity",
                 y=metric,
                 hue="Model",
                 ax=axes[0],
                 order=["static_down", "static_strm"],
+                hue_order=model_order,
             )
             axes[0].set_title(f"Static: {metric} ({target})")
+            axes[0].set_xlabel("Activity")
             axes[0].set_ylabel(metric)
             axes[0].legend(title="Model", loc="upper left")
 
             # Filter and sort data for driving activities
             driving_data = target_data[target_data["Activity"].str.contains("driving")]
-            driving_data_sorted = driving_data.sort_values(by=metric, ascending=True)
             sns.barplot(
-                data=driving_data_sorted,
+                data=driving_data,
                 x="Activity",
                 y=metric,
                 hue="Model",
                 ax=axes[1],
                 order=["driving_down", "driving_strm"],
+                hue_order=model_order,
             )
             axes[1].set_title(f"Driving: {metric} ({target})")
-            axes[1].set_ylabel(metric)
+            axes[1].set_xlabel("Activity")
             axes[1].legend(title="Model", loc="upper left")
 
-            # Adjusting layout and displaying the plot
-            plt.xlabel("Activity")
-            plt.xticks(rotation=45)
-            plt.tight_layout()
+            # Adjusting layout
+            for ax in axes:
+                ax.tick_params(axis="x", rotation=45)
+
+            plt.suptitle(f"Comparison of {metric} for Target: {target}", fontsize=16)
+            plt.tight_layout(rect=[0, 0, 1, 0.95])  # Leave space for the suptitle
             plt.show()
 
 

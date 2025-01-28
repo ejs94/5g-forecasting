@@ -128,8 +128,16 @@ baseline_models = {
         add_encoders=None,  # Não adicionar codificadores (opcional)
     ),
     "Theta": Theta(theta=1.0, season_mode=SeasonalityMode.NONE),
-    "FFT": FFT(),
-    "Prophet": Prophet(),
+    "FFT": FFT(n_components=5),
+    "Prophet": Prophet(
+        yearly_seasonality=False,
+        weekly_seasonality=False,
+        daily_seasonality=False,
+        n_changepoints=50,
+        changepoint_range=0.9,
+        changepoint_prior_scale=0.1,
+        interval_width=0.95,
+    ),
 }
 
 print("---Configurando os modelos Machine Learning---")
@@ -190,10 +198,12 @@ def train_process_timeseries(row, column_name, horizon=10):
 
     # Calcular o ratio de valores ausentes
     ratio_missing = missing_values_ratio(ts)
-    print(f"Missing ratio for {column_name}: {ratio_missing * 100:.2f}%")
+    tqdm.write(f"[INFO] Missing ratio for {column_name}: {ratio_missing * 100:.2f}%")
 
     if ratio_missing > 0.4:  # Se mais de 40% dos valores estão ausentes, descartar
-        print(f"Descartando a série {column_name} para o Uid {row['Uid']} (NaN > 40%)")
+        tqdm.write(
+            f"[INFO] Descartando a série {column_name} para o Uid {row['Uid']} (NaN > 40%)"
+        )
         return None
 
     # Preencher valores ausentes com backward fill
@@ -203,8 +213,8 @@ def train_process_timeseries(row, column_name, horizon=10):
     subseries = extract_subseries(ts, min_gap_size=horizon, mode="any")
 
     if not subseries:
-        print(
-            f"Nenhuma sub-série válida encontrada para {column_name} (Uid {row['Uid']})"
+        tqdm.write(
+            f"[WARNING] Nenhuma sub-série válida encontrada para {column_name} (Uid {row['Uid']})"
         )
         return None
 

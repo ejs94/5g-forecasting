@@ -212,9 +212,26 @@ def train_process_timeseries(row, column_name, horizon=10):
 
 
 def save_results(
-    result_records, no_window_results_path, model_name, activity, column_name
+    result_records,
+    no_window_results_path,
+    model_name,
+    activity,
+    column_name,
+    processed_count,
+    discarded_count,
 ):
-    """Save results to a Parquet file."""
+    """
+    Save results to a Parquet file and log the number of processed and discarded series.
+
+    Args:
+        result_records (list[pd.DataFrame]): List of result records to save.
+        no_window_results_path (str): Path to save the results.
+        model_name (str): Name of the model.
+        activity (str): Name of the activity.
+        column_name (str): Name of the target column.
+        processed_count (int): Number of series processed.
+        discarded_count (int): Number of series discarded.
+    """
     if result_records:
         result_record = pd.concat(result_records)
         output_file = os.path.join(
@@ -227,6 +244,12 @@ def save_results(
         tqdm.write(
             f"[WARNING] No results for activity '{activity}' with model '{model_name}'"
         )
+
+    # Log the number of processed and discarded series
+    tqdm.write(
+        f"[INFO] Activity: {activity}, Model: {model_name}, Column: {column_name}\n"
+        f"       Processed series: {processed_count}, Discarded series: {discarded_count}"
+    )
 
 
 def train_and_evaluate_models(models, time_series_dict, config, output_path):

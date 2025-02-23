@@ -87,7 +87,7 @@ def aggregate_median_metrics(df: pd.DataFrame) -> pd.DataFrame:
 
 def plot_bar_for_medians_by_target(df: pd.DataFrame) -> None:
     """
-    Generates bar plots for the metrics MAE_Median, RMSE_Median, MSE_Median, NRMSE_Median, and NMSE_Median,
+    Generates improved bar plots for the metrics MAE_Median, RMSE_Median, MSE_Median, NRMSE_Median, and NMSE_Median,
     separated by each unique target in the DataFrame, with subplots for static and driving activities.
 
     Parameters:
@@ -102,25 +102,38 @@ def plot_bar_for_medians_by_target(df: pd.DataFrame) -> None:
     # List of metrics to be plotted
     metrics = ["MAE_Median", "RMSE_Median", "MSE_Median", "NRMSE_Median", "NMSE_Median"]
 
-    # Reorganized model order
     full_model_order = [
-        # Baseline models
         "Naive",
         "NaiveDrift",
         "NaiveMean",
         "NaiveMovingAverage",
-        # Statistical methods
-        "ARIMA",
-        "ExponentialSmoothing",
-        "FFT",
-        "Prophet",
-        "Theta",
-        # Machine Learning models
-        "LightGBM",
         "LinearRegression",
+        "ExponentialSmoothing",
+        "ARIMA",
+        "FFT",
+        "Theta",
+        "LightGBM",
         "LSTM",
         "NBEATS",
+        "Prophet",
     ]
+
+    # Desired label mapping
+    label_mapping = {
+        "Naive": "Naïve",
+        "NaiveDrift": "Naïve Drift",
+        "NaiveMean": "Naïve Mean",
+        "NaiveMovingAverage": "Naïve Mov Avg",
+        "LinearRegression": "Lin Regression",
+        "ExponentialSmoothing": "ES",
+        "ARIMA": "ARIMA",
+        "FFT": "FFT",
+        "Theta": "Theta",
+        "LightGBM": "LightGBM",
+        "LSTM": "LSTM",
+        "NBEATS": "NBEATS",
+        "Prophet": "Prophet",
+    }
 
     # Determine models present in the DataFrame
     models_in_data = df["Model"].unique()
@@ -133,17 +146,34 @@ def plot_bar_for_medians_by_target(df: pd.DataFrame) -> None:
             f"[WARNING] The following models are missing in the DataFrame: {missing_models}"
         )
 
-    # Iterate over each unique target
+    # Define a custom color palette
+    custom_colors = [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf",
+        "#aec7e8",
+        "#ffbb78",
+        "#98df8a",
+    ]
+
+    # Assign colors to models
+    model_palette = dict(zip(model_order, custom_colors[: len(model_order)]))
+
+    # Plotting the graphs
     for target in targets:
-        # Filtering data for the specific target
         target_data = df[df["target"] == target]
 
-        # Iterate over each metric
         for metric in metrics:
-            # Creating a figure with two subplots (static and driving)
             fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
 
-            # Filter and sort data for static activities
+            # Static activities
             static_data = target_data[target_data["Activity"].str.contains("static")]
             sns.barplot(
                 data=static_data,
@@ -153,13 +183,18 @@ def plot_bar_for_medians_by_target(df: pd.DataFrame) -> None:
                 ax=axes[0],
                 order=["static_down", "static_strm"],
                 hue_order=model_order,
+                palette=model_palette,
             )
-            axes[0].set_title(f"Static: {metric} ({target})")
-            axes[0].set_xlabel("Activity")
-            axes[0].set_ylabel(metric)
-            axes[0].legend(title="Model", loc="upper left")
+            axes[0].set_title("Static")
+            axes[0].set_ylabel(
+                metric.replace("_", " ")
+            )  # Replace _ with space for display
+            axes[0].set_xticks(range(2))  # Define explicit tick positions
+            axes[0].set_xticklabels(["Downloading", "Streaming"])
+            axes[0].set_xlabel("")
+            axes[0].legend().remove()
 
-            # Filter and sort data for driving activities
+            # Driving activities
             driving_data = target_data[target_data["Activity"].str.contains("driving")]
             sns.barplot(
                 data=driving_data,
@@ -169,17 +204,36 @@ def plot_bar_for_medians_by_target(df: pd.DataFrame) -> None:
                 ax=axes[1],
                 order=["driving_down", "driving_strm"],
                 hue_order=model_order,
+                palette=model_palette,
             )
-            axes[1].set_title(f"Driving: {metric} ({target})")
-            axes[1].set_xlabel("Activity")
-            axes[1].legend(title="Model", loc="upper left")
+            axes[1].set_title("Driving")
+            axes[1].set_xticks(range(2))  # Define explicit tick positions
+            axes[1].set_xticklabels(["Downloading", "Streaming"])
+            axes[1].set_xlabel("")
+            axes[1].legend().remove()
 
-            # Adjusting layout
-            for ax in axes:
-                ax.tick_params(axis="x", rotation=45)
+            # Adjust layout and add a vertical legend with updated labels
+            handles, labels = axes[0].get_legend_handles_labels()
 
-            plt.suptitle(f"Comparison of {metric} for Target: {target}", fontsize=16)
-            plt.tight_layout(rect=[0, 0, 1, 0.95])  # Leave space for the suptitle
+            # Replace labels with the new mapped labels
+            updated_labels = [label_mapping.get(label, label) for label in labels]
+
+            fig.legend(
+                handles,
+                updated_labels,
+                loc="center left",
+                ncol=1,
+                bbox_to_anchor=(0.9, 0.5),
+                fontsize="small",
+                title="Models",
+            )
+
+            plt.suptitle(
+                f"Comparison of {metric.replace('_', ' ')} for {target}",
+                fontsize=16,
+                fontweight="bold",
+            )
+            plt.tight_layout(rect=[0, 0, 0.9, 0.92])
             plt.show()
 
 
@@ -187,8 +241,8 @@ def plot_boxplots_for_metrics_by_target(
     data: pd.DataFrame, show_outliers: bool = True
 ) -> None:
     """
-    Function to generate boxplots of MAE, RMSE, MSE, NRMSE, and NMSE grouped by 'Model', 'target', and 'Activity',
-    with separate plots for static and driving activities displayed side-by-side.
+    Generates boxplots for MAE, RMSE, MSE, NRMSE, and NMSE grouped by 'Model', 'target', and 'Activity',
+    with separate plots for static and driving activities. Each metric gets its own figure.
 
     Parameters:
     data (pd.DataFrame): DataFrame containing the data with columns 'Model', 'target', 'Activity', 'MAE', 'RMSE', 'MSE', 'NRMSE', 'NMSE'.
@@ -197,54 +251,141 @@ def plot_boxplots_for_metrics_by_target(
     Returns:
     None: Displays the boxplot graphs.
     """
+    # Define a custom color palette
+    custom_colors = [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf",
+        "#aec7e8",
+        "#ffbb78",
+        "#98df8a",
+    ]
+
+    # Desired label mapping
+    label_mapping = {
+        "Naive": "Naïve",
+        "NaiveDrift": "Naïve Drift",
+        "NaiveMean": "Naïve Mean",
+        "NaiveMovingAverage": "Naïve Mov Avg",
+        "LinearRegression": "Lin Regression",
+        "ExponentialSmoothing": "ES",
+        "ARIMA": "ARIMA",
+        "FFT": "FFT",
+        "Theta": "Theta",
+        "LightGBM": "LightGBM",
+        "LSTM": "LSTM",
+        "NBEATS": "NBEATS",
+        "Prophet": "Prophet",
+    }
+
+    # Define the desired order of models
+    model_order = [
+        "Naive",
+        "NaiveDrift",
+        "NaiveMean",
+        "NaiveMovingAverage",  # Baseline benchmarks
+        "LinearRegression",
+        "ExponentialSmoothing",  # Standard benchmarks
+        "ARIMA",
+        "FFT",
+        "Theta",  # Statistical methods
+        "LightGBM",
+        "LSTM",
+        "NBEATS",
+        "Prophet",  # Machine Learning models
+    ]
+
     # Define the desired order of activities
     static_activities = ["static_down", "static_strm"]
     driving_activities = ["driving_down", "driving_strm"]
 
+    # List of metrics
+    metrics = ["MAE", "RMSE", "MSE", "NRMSE", "NMSE"]
+
     # Get unique targets
     targets = data["target"].unique()
+
+    # Assign colors to models using the custom color palette
+    model_palette = dict(zip(model_order, custom_colors[: len(model_order)]))
 
     # Loop through the targets (e.g., CQI, RSRP, RSRQ, RSSI, SNR)
     for target in targets:
         # Filter the data for the current target
         data_subset = data[data["target"] == target]
 
-        # Create subplots for static and driving activities side-by-side
-        fig, axes = plt.subplots(5, 2, figsize=(18, 30))
-        fig.suptitle(f"Forecasting Metrics for {target}", fontsize=16)
+        for metric in metrics:
+            fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-        # List of metrics
-        metrics = ["MAE", "RMSE", "MSE", "NRMSE", "NMSE"]
-
-        # Plot each metric for static and driving activities
-        for i, metric in enumerate(metrics):
             # Static activities
+            static_data = data_subset[data_subset["Activity"].isin(static_activities)]
             sns.boxplot(
-                data=data_subset[data_subset["Activity"].isin(static_activities)],
+                data=static_data,
                 x="Activity",
                 y=metric,
                 hue="Model",
-                ax=axes[i, 0],
+                hue_order=[
+                    m for m in model_order if m in static_data["Model"].unique()
+                ],
+                ax=axes[0],
                 order=static_activities,
                 showfliers=show_outliers,
+                palette=model_palette,
             )
-            axes[i, 0].set_title(f"Static: {metric}")
-            axes[i, 0].set_ylabel(metric)
-            axes[i, 0].legend(title="Model", loc="upper left", bbox_to_anchor=(1, 1))
+            axes[0].set_title("Static")
+            axes[0].set_ylabel(metric)
+            axes[0].set_xticks(range(2))
+            axes[0].set_xticklabels(["Downloading", "Streaming"])
+            axes[0].set_xlabel("")
+            axes[0].legend().remove()
 
             # Driving activities
+            driving_data = data_subset[data_subset["Activity"].isin(driving_activities)]
             sns.boxplot(
-                data=data_subset[data_subset["Activity"].isin(driving_activities)],
+                data=driving_data,
                 x="Activity",
                 y=metric,
                 hue="Model",
-                ax=axes[i, 1],
+                hue_order=[
+                    m for m in model_order if m in driving_data["Model"].unique()
+                ],
+                ax=axes[1],
                 order=driving_activities,
                 showfliers=show_outliers,
+                palette=model_palette,
             )
-            axes[i, 1].set_title(f"Driving: {metric}")
-            axes[i, 1].legend(title="Model", loc="upper left", bbox_to_anchor=(1, 1))
+            axes[1].set_title("Driving")
+            axes[1].set_xticks(range(2))
+            axes[1].set_xticklabels(["Downloading", "Streaming"])
+            axes[1].set_xlabel("")
+            axes[1].legend().remove()
 
-        # Adjust layout
-        plt.tight_layout(rect=[0, 0, 1, 0.96])
-        plt.show()
+            # Ajusta espaçamento entre os gráficos
+            plt.subplots_adjust(wspace=0.3)
+
+            # Ajuste da legenda global
+            handles, labels = axes[1].get_legend_handles_labels()
+            # Replace labels with the new mapped labels
+            updated_labels = [label_mapping.get(label, label) for label in labels]
+
+            fig.legend(
+                handles,
+                updated_labels,
+                loc="center left",
+                ncol=1,
+                bbox_to_anchor=(0.9, 0.5),
+                fontsize="small",
+                title="Models",
+            )
+
+            plt.suptitle(
+                f"Comparison of {metric} for {target}", fontsize=16, fontweight="bold"
+            )
+            plt.tight_layout(rect=[0, 0, 0.9, 0.92])
+            plt.show()

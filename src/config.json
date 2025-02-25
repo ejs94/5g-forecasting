@@ -1,6 +1,7 @@
 {
     "H": 10,
     "K": 50,
+    "split_ratio": 0.9,
     "update_interval": 10,
     "target_columns": [
         "RSRP",

@@ -5,12 +5,11 @@ import multiprocessing
 import os
 import pickle
 import time
-import traceback
 import warnings
 
 import pandas as pd
 import torch
-from darts import TimeSeries, concatenate
+from darts import TimeSeries
 from darts.dataprocessing import Pipeline
 from darts.dataprocessing.transformers import Scaler
 from darts.models import (
@@ -33,8 +32,9 @@ from darts.utils.missing_values import (
     fill_missing_values,
     missing_values_ratio,
 )
-from tqdm.auto import tqdm
+from darts.utils.model_selection import train_test_split
 from darts.utils.utils import SeasonalityMode
+from tqdm.auto import tqdm
 
 warnings.filterwarnings("ignore")
 
@@ -70,9 +70,10 @@ config_path = os.path.join(os.curdir, "config.json")
 # Verifica se o arquivo de configuração já existe; caso contrário, cria um
 if not os.path.exists(config_path):
     config = {
-        "H": 10,  # Tamanho da janela de previsão
-        "K": 50,  # Tamanho da janela de entrada
-        "update_interval": 10,  # Atualização da janela deslizante
+        "H": 10,
+        "K": 50,
+        "split_ratio": 0.9,
+        "update_interval": 10,
         "target_columns": ["RSRP", "RSRQ", "SNR", "CQI", "RSSI"],
     }
     with open(config_path, "w") as f:
@@ -263,7 +264,7 @@ def save_results(
 
 
 def train_and_evaluate_models(models, time_series_dict, config, output_path):
-    horizon = config["H"]
+    split_ratio = config["split_ratio"]
     scaler = Scaler()
     pipe = Pipeline([scaler])
 
@@ -276,7 +277,6 @@ def train_and_evaluate_models(models, time_series_dict, config, output_path):
                 processed_count = 0  # Contador de séries processadas
                 discarded_count = 0  # Contador de séries descartadas
 
-                # Processa todas as séries que serão treinadas e remove valores inválidos.
                 processed_series = []
                 for idx, row in pd_series.iterrows():
                     subseries = train_process_timeseries(
@@ -284,47 +284,40 @@ def train_and_evaluate_models(models, time_series_dict, config, output_path):
                     )
                     if subseries:
                         processed_series.extend(subseries)
-                        processed_count += 1  # Incrementa o contador de processadas
+                        processed_count += 1
                     else:
-                        discarded_count += 1  # Incrementa o contador de descartadas
+                        discarded_count += 1
 
-                # Vai para proxima métrica caso não haja séries temporais.
                 if not processed_series:
                     tqdm.write(
                         f"[WARNING] No valid series for {activity}, {column_name}, {model_name}"
                     )
                     continue
 
-                # Treina toda as séries para aquela métrica e modelo.
                 for series in tqdm(
                     processed_series,
                     desc=f"Training Series {idx}: {column_name} ({model_name})",
                     leave=False,
                 ):
-                    # Start time for training this series
                     start_time = time.time()
 
-                    # Train the model with processed series
-                    train_data = series[:-horizon]
-                    test_horizon = series[-horizon:]
+                    train_data, test_horizon = train_test_split(
+                        series, test_size=split_ratio, axis=1
+                    )
 
                     ts_transformed = pipe.fit_transform(train_data)
 
                     model.fit(ts_transformed)
-
                     y_pred = model.predict(len(test_horizon))
 
-                    # Calculate elapsed time for training this series
                     elapsed_time = time.time() - start_time
 
-                    # Save the trained model
                     model_dir = os.path.join(
                         output_path, "models", activity, column_name
                     )
                     os.makedirs(model_dir, exist_ok=True)
                     model.save(os.path.join(model_dir, f"lst_{model_name}_model.pkl"))
 
-                    # Append results to the temporary record list
                     evaluation_results.append(
                         pd.DataFrame(
                             {
@@ -362,7 +355,6 @@ def train_and_evaluate_models(models, time_series_dict, config, output_path):
                         )
                     )
 
-                # Save activity-specific results and go to next metrics
                 save_results(
                     evaluation_results,
                     output_path,
@@ -373,7 +365,6 @@ def train_and_evaluate_models(models, time_series_dict, config, output_path):
                     discarded_count,
                 )
 
-                # Clear memory after processing each activity
                 del evaluation_results
                 gc.collect()
 

@@ -129,7 +129,7 @@ baseline_models = {
         add_encoders=None,  # Não adicionar codificadores (opcional)
     ),
     "Theta": Theta(theta=1.0, season_mode=SeasonalityMode.NONE),
-    "FFT": FFT(n_components=5),
+    "FFT": FFT(),
     "Prophet": Prophet(
         yearly_seasonality=False,
         weekly_seasonality=False,

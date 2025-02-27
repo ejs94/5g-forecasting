@@ -218,6 +218,13 @@ def train_process_timeseries(row, column_name, horizon=10):
             f"[WARNING] Nenhuma sub-série válida encontrada para {column_name} (Uid {row['Uid']})"
         )
         return None
+    
+    # Filtrar sub-séries com menos de 30 pontos
+    subseries = [s for s in subseries if len(s) >= 30]
+
+    if not subseries:
+        tqdm.write(f"[WARNING] Todas as sub-séries de {column_name} (Uid {row['Uid']}) têm menos de 30 pontos e foram descartadas.")
+        return None
 
     return subseries
 

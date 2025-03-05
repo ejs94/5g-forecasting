@@ -70,8 +70,8 @@ config_path = os.path.join(os.curdir, "config.json")
 # Verifica se o arquivo de configuração já existe; caso contrário, cria um
 if not os.path.exists(config_path):
     config = {
-        "H": 10,
-        "K": 50,
+        "H": 5,
+        "K": 25,
         "split_ratio": 0.9,
         "update_interval": 10,
         "target_columns": ["RSRP", "RSRQ", "SNR", "CQI", "RSSI"],
@@ -113,7 +113,7 @@ baseline_models = {
     "NaiveMovingAverage": NaiveMovingAverage(input_chunk_length=config["K"]),
     "NaiveMean": NaiveMean(),
     "ExponentialSmoothing": ExponentialSmoothing(seasonal=None),
-    "LinearRegression": LinearRegressionModel(lags=50),
+    "LinearRegression": LinearRegressionModel(lags=config["K"]),
     "ARIMA": ARIMA(
         p=1,  # Ordem do autoregressivo (AR) - número de lags
         d=1,  # Ordem de diferenciação (I) - número de diferenciações
@@ -213,17 +213,13 @@ def train_process_timeseries(row, column_name, horizon=10):
     # Dividir em sub-séries apenas se lacunas consecutivas forem maiores que o horizonte
     subseries = extract_subseries(ts, min_gap_size=horizon, mode="any")
 
+    # # Filtrar séries muito curtas
+    # subseries_validas = [s for s in subseries if len(s) > 100]
+
     if not subseries:
         tqdm.write(
             f"[WARNING] Nenhuma sub-série válida encontrada para {column_name} (Uid {row['Uid']})"
         )
-        return None
-    
-    # Filtrar sub-séries com menos de 30 pontos
-    subseries = [s for s in subseries if len(s) >= 30]
-
-    if not subseries:
-        tqdm.write(f"[WARNING] Todas as sub-séries de {column_name} (Uid {row['Uid']}) têm menos de 30 pontos e foram descartadas.")
         return None
 
     return subseries
@@ -311,6 +307,10 @@ def train_and_evaluate_models(models, time_series_dict, config, output_path):
                     train_data, test_horizon = train_test_split(
                         series, test_size=split_ratio, axis=1
                     )
+
+                    # Correção para modelos que precisam de um min de pontos em seu treino.
+                    if len(train_data) <= 30:
+                        continue
 
                     ts_transformed = pipe.fit_transform(train_data)
 

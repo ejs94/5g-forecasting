@@ -1,6 +1,6 @@
 {
-    "H": 10,
-    "K": 50,
+    "H": 5,
+    "K": 25,
     "split_ratio": 0.9,
     "update_interval": 10,
     "target_columns": [

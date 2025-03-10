@@ -12,6 +12,7 @@ from utils import (
     separate_by_uid_and_frequency,
 )
 
+
 def load_or_create_config(config_path):
     """
     Carrega a configuração do arquivo JSON ou cria uma configuração padrão.
@@ -22,7 +23,7 @@ def load_or_create_config(config_path):
         print(f"Lendo configuração existente de: {config_path}")
     else:
         config = {
-            "split_ratio": 0.9,
+            "test_ratio": 0.1,
             "update_interval": 10,
             "target_columns": ["RSRP", "RSRQ", "SNR", "CQI", "RSSI"],
         }
@@ -31,12 +32,14 @@ def load_or_create_config(config_path):
         print(f"Configuração inicial salva em: {config_path}")
     return config
 
+
 def save_dataframe_to_parquet(df, path):
     """
     Salva um DataFrame no formato Parquet com compressão gzip.
     """
     df.to_parquet(path, compression="gzip")
     print(f"Dados salvos em: {path}")
+
 
 def group_metrics_by_uid(df, freq="s"):
     """
@@ -45,6 +48,7 @@ def group_metrics_by_uid(df, freq="s"):
     df = df.asfreq(freq=freq).reset_index()
     metrics = ["Timestamp", "RSRP", "RSRQ", "SNR", "CQI", "RSSI"]
     return df.groupby("Uid").agg({metric: list for metric in metrics}).reset_index()
+
 
 def save_grouped_metrics_to_pickle(df, activity_name, output_dir, freq="s"):
     """
@@ -56,7 +60,10 @@ def save_grouped_metrics_to_pickle(df, activity_name, output_dir, freq="s"):
         pickle.dump(reduced_df, f)
     print(f"Arquivo pickle salvo em: {pickle_path}")
 
-def process_reduced_metrics(list_static_strm, list_driving_strm, list_static_down, list_driving_down, output_dir):
+
+def process_reduced_metrics(
+    list_static_strm, list_driving_strm, list_static_down, list_driving_down, output_dir
+):
     """
     Processa e salva os datasets reduzidos.
     """
@@ -65,6 +72,7 @@ def process_reduced_metrics(list_static_strm, list_driving_strm, list_static_dow
     save_grouped_metrics_to_pickle(list_driving_strm, "driving_strm", output_dir)
     save_grouped_metrics_to_pickle(list_static_down, "static_down", output_dir)
     save_grouped_metrics_to_pickle(list_driving_down, "driving_down", output_dir)
+
 
 def main():
     """
@@ -82,8 +90,12 @@ def main():
     df_static = preprocess_5G_dataframe(df_static)
     df_driving = preprocess_5G_dataframe(df_driving)
 
-    save_dataframe_to_parquet(df_static, os.path.join(data_path, "5G_df_static.parquet"))
-    save_dataframe_to_parquet(df_driving, os.path.join(data_path, "5G_df_driving.parquet"))
+    save_dataframe_to_parquet(
+        df_static, os.path.join(data_path, "5G_df_static.parquet")
+    )
+    save_dataframe_to_parquet(
+        df_driving, os.path.join(data_path, "5G_df_driving.parquet")
+    )
 
     df_static = pd.read_parquet(os.path.join(data_path, "5G_df_static.parquet"))
     df_driving = pd.read_parquet(os.path.join(data_path, "5G_df_driving.parquet"))
@@ -95,7 +107,14 @@ def main():
     list_driving_down = df_driving.query("User_Activity == 'Downloading a File'")
 
     print("--- Criando datasets com as métricas reduzidas ---")
-    process_reduced_metrics(list_static_strm, list_driving_strm, list_static_down, list_driving_down, reduced_output_dir)
+    process_reduced_metrics(
+        list_static_strm,
+        list_driving_strm,
+        list_static_down,
+        list_driving_down,
+        reduced_output_dir,
+    )
+
 
 if __name__ == "__main__":
     main()

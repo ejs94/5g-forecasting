@@ -72,7 +72,7 @@ if not os.path.exists(config_path):
     config = {
         "H": 5,
         "K": 25,
-        "split_ratio": 0.9,
+        "test_ratio": 0.1,
         "update_interval": 10,
         "target_columns": ["RSRP", "RSRQ", "SNR", "CQI", "RSSI"],
     }
@@ -267,7 +267,7 @@ def save_results(
 
 
 def train_and_evaluate_models(models, time_series_dict, config, output_path):
-    split_ratio = config["split_ratio"]
+    test_ratio = config["test_ratio"]
     scaler = Scaler()
     pipe = Pipeline([scaler])
 
@@ -305,7 +305,7 @@ def train_and_evaluate_models(models, time_series_dict, config, output_path):
                     start_time = time.time()
 
                     train_data, test_horizon = train_test_split(
-                        series, test_size=split_ratio, axis=1
+                        series, test_size=test_ratio, axis=1
                     )
 
                     # Correção para modelos que precisam de um min de pontos em seu treino.

@@ -85,9 +85,10 @@ def preprocess_5G_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     # Change objects columns to int64 dtype
     # cleaned[["RSRQ","SNR","CQI", "RSSI"]] = cleaned[["RSRQ","SNR","CQI", "RSSI"]].astype(float).astype('Int64')
-    cleaned[["RSRP", "RSRQ", "SNR", "CQI", "RSSI"]] = cleaned[
-        ["RSRP", "RSRQ", "SNR", "CQI", "RSSI"]
-    ].astype(float)
+
+    # Convert selected columns to float
+    metric_columns = ["RSRP", "RSRQ", "SNR", "CQI", "RSSI", "DL_bitrate", "UL_bitrate", "Speed"]
+    cleaned[metric_columns] = cleaned[metric_columns].astype(float)
 
     # Configurar a coluna de data/hora como índice
     cleaned = cleaned.set_index("Timestamp")

@@ -46,7 +46,7 @@ def group_metrics_by_uid(df, freq="s"):
     Agrupa métricas por Uid e ajusta a frequência temporal.
     """
     df = df.asfreq(freq=freq).reset_index()
-    metrics = ["Timestamp", "RSRP", "RSRQ", "SNR", "CQI", "RSSI"]
+    metrics = ["Timestamp", "RSRP", "RSRQ", "SNR", "CQI", "RSSI", "DL_bitrate", "UL_bitrate", "Speed"]
     return df.groupby("Uid").agg({metric: list for metric in metrics}).reset_index()
 
 

@@ -1,37 +1,9 @@
-import json
 import os
 import pickle
-import shutil
-import numpy as np
+
 import pandas as pd
-from darts import TimeSeries
-from utils import (
-    convert_dfs_to_ts,
-    extract_5G_dataset,
-    preprocess_5G_dataframe,
-    separate_by_uid_and_frequency,
-)
 
-
-def load_or_create_config(config_path):
-    """
-    Carrega a configuração do arquivo JSON ou cria uma configuração padrão.
-    """
-    if os.path.exists(config_path):
-        with open(config_path, "r") as f:
-            config = json.load(f)
-        print(f"Lendo configuração existente de: {config_path}")
-    else:
-        config = {
-            "test_ratio": 0.1,
-            "update_interval": 10,
-            "target_columns": ["RSRP", "RSRQ", "SNR", "CQI", "RSSI"],
-        }
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=4)
-        print(f"Configuração inicial salva em: {config_path}")
-    return config
-
+from pipeline_5g.utils import extract_5G_dataset, preprocess_5G_dataframe
 
 def save_dataframe_to_parquet(df, path):
     """
@@ -39,7 +11,6 @@ def save_dataframe_to_parquet(df, path):
     """
     df.to_parquet(path, compression="gzip")
     print(f"Dados salvos em: {path}")
-
 
 def group_metrics_by_uid(df, freq="s"):
     """

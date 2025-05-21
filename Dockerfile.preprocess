@@ -4,15 +4,22 @@ FROM python:3.10-slim
 # Set the working directory
 WORKDIR /app
 
+# Copy setup.py and pyproject.toml to install package in editable mode
+COPY setup.py pyproject.toml /app/
+
 # Install dependencies (add required packages for preprocessing)
 COPY requirements.preprocess.txt /app/
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.preprocess.txt
+
+# Install the pipeline_5g package in editable mode
+RUN pip install -e . --use-pep517
 
 # Copy datasets to preprocess
 COPY ./datasets /app/datasets
 
 # Copy preprocessing script
 COPY ./src /app
+COPY ./pipeline_5g /app/pipeline_5g
 
 # Command to run the preprocessing script
 CMD ["python3", "prepare_dataset.py"]

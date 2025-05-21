@@ -33,12 +33,6 @@ from darts.utils.statistics import (
 from darts.utils.utils import SeasonalityMode
 from tqdm.auto import tqdm
 
-from utils import (
-    convert_dfs_to_ts,
-    preprocess_list_ts,
-    separate_by_uid_and_frequency,
-)
-
 warnings.filterwarnings("ignore")
 
 print("---Verificando se há GPU---")

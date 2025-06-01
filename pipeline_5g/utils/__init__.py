@@ -5,7 +5,6 @@ from .timeseries import (
     create_covariates_timeseries,
     create_target_timeseries,
     impute_timeseries_missing_values,
-    split_and_impute_timeseries_on_gaps,
 )
 from .timeseries_analysis import adf_test
 

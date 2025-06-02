@@ -22,6 +22,10 @@ RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.gpu.
 
 # Copia o código fonte para o contêiner
 COPY ./src /app
+COPY ./pipeline_5g /app/pipeline_5g
+
+# Install the pipeline_5g package in editable mode
+RUN pip install -e . --use-pep517
 
 # Define o comando padrão ao iniciar o contêiner
-CMD ["python3", "train_models_no_sliding_window.py"]
+CMD ["python3", "train_models_covariates.py"]

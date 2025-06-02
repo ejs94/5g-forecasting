@@ -167,111 +167,54 @@ def impute_timeseries_missing_values(
     ele pode ser preenchido com `fill_all_nan_with`.
 
     Args:
-        ts (TimeSeries | None): Objeto TimeSeries Darts.
-        fill_all_nan_with (float | None): Valor para preencher componentes que são
-                                          inteiramente NaN após a imputação inicial.
-                                          Se None, componentes totalmente NaN permanecem NaN.
+        ts (TimeSeries | None): Série temporal de entrada.
+        fill_all_nan_with (float | None): Valor para preencher componentes totalmente NaN, se desejado.
 
     Returns:
-        TimeSeries | None: A TimeSeries imputada, ou None se a entrada for None ou vazia.
+        TimeSeries | None: Série temporal imputada ou None se entrada inválida.
     """
     if ts is None or len(ts) == 0:
-        print("[INFO] TimeSeries de entrada é None ou vazia. Nenhuma imputação realizada.")
         return ts
 
-    print(f"[INFO] Imputando TimeSeries com {ts.n_components} componente(s) e {len(ts)} observações.")
+    ts_imputed_initial = fill_missing_values(ts)
 
-    # Imputação inicial usando o método padrão do Darts
-    # fill_value=None usa interpolação linear por padrão para numéricos.
-    # Para outros tipos, pode usar 'mode'.
-    ts_imputed_initial = fill_missing_values(ts) 
-
-    # Verificar e tratar componentes que ainda são totalmente NaN
-    if ts_imputed_initial.width > 1:  # Multivariada
+    if ts_imputed_initial.width > 1:
+        # Multivariada
         components_data = []
-        component_names = ts_imputed_initial.components.tolist()
+        for component_name in ts_imputed_initial.components:
+            comp_ts = ts_imputed_initial[component_name]
+            values = comp_ts.values(copy=False)
 
-        for component_name in component_names:
-            # Extrai a componente como uma TimeSeries univariada
-            component_ts = ts_imputed_initial[component_name]
-            
-            # Verifica se esta componente univariada é totalmente NaN
-            # Acessa os valores como um array numpy e verifica se todos são NaN
-            component_values = component_ts.values(copy=False) # Evita cópia desnecessária
-            is_all_nan_component = np.isnan(component_values).all()
-
-            if is_all_nan_component:
-                print(f"[WARNING] Componente '{component_name}' ainda é totalmente NaN após imputação inicial.")
+            if np.isnan(values).all():
                 if fill_all_nan_with is not None:
-                    print(f"Preenchendo componente '{component_name}' com {fill_all_nan_with}.")
-                    # Cria uma série pandas preenchida e converte para TimeSeries
-                    filled_pd_series = pd.Series(fill_all_nan_with, index=component_ts.time_index, name=component_name)
-                    components_data.append(filled_pd_series)
+                    filled = pd.Series(fill_all_nan_with, index=comp_ts.time_index, name=component_name)
                 else:
-                    print(f"Componente '{component_name}' permanecerá totalmente NaN.")
-                    components_data.append(component_ts.pd_series()) # Adiciona como está (todos NaN)
+                    filled = pd.Series(np.nan, index=comp_ts.time_index, name=component_name)
             else:
-                # Se não for tudo NaN, verificar se ainda há algum NaN (fill_missing_values pode não preencher pontas)
-                current_component_pd_series = component_ts.pd_series()
-                if current_component_pd_series.isnull().any(): # Verifica se há algum NaN na componente
-                     filled_edges_pd_series = current_component_pd_series.bfill().ffill() # Tenta preencher pontas
-                     # Verifica novamente se ainda há NaNs e se devemos preenchê-los
-                     if filled_edges_pd_series.isnull().any() and fill_all_nan_with is not None:
-                         print(f"[WARNING] Componente '{component_name}' ainda tem NaNs residuais nas pontas. Preenchendo com {fill_all_nan_with}.")
-                         filled_edges_pd_series = filled_edges_pd_series.fillna(fill_all_nan_with)
-                     components_data.append(filled_edges_pd_series)
-                else:
-                    components_data.append(current_component_pd_series)
-        
-        if not components_data:
-            # Isso não deve acontecer se ts_imputed_initial.width > 1 e component_names não for vazio
-            print("[WARNING] Nenhum dado de componente processado para série multivariada. Retornando série imputada inicial.")
-            return ts_imputed_initial
-            
-        final_df = pd.concat(components_data, axis=1)
-        # Tenta preservar a frequência original
-        ts_imputed = TimeSeries.from_dataframe(final_df, freq=ts_imputed_initial.freq_str, fill_missing_dates=True)
+                filled = comp_ts.to_series().bfill().ffill()
+                if filled.isnull().any() and fill_all_nan_with is not None:
+                    filled = filled.fillna(fill_all_nan_with)
 
-    else:  # Univariada
-        ts_imputed_values = ts_imputed_initial.values(copy=False)
-        is_all_nan_univariate = np.isnan(ts_imputed_values).all()
+            components_data.append(filled)
 
-        if is_all_nan_univariate:
-            print("[WARNING] Série univariada ainda é totalmente NaN após imputação inicial.")
-            if fill_all_nan_with is not None:
-                print(f"Preenchendo série univariada com {fill_all_nan_with}.")
-                filled_pd_series = pd.Series(fill_all_nan_with, index=ts_imputed_initial.time_index)
-                ts_imputed = TimeSeries.from_series(filled_pd_series, freq=ts_imputed_initial.freq_str, fill_missing_dates=True)
-            else:
-                print("Série univariada permanecerá totalmente NaN.")
-                ts_imputed = ts_imputed_initial  # Mantém como está (todos NaN)
-        else:
-            current_univariate_pd_series = ts_imputed_initial.pd_series()
-            # Verifica se ainda há algum NaN (fill_missing_values pode não preencher pontas)
-            if current_univariate_pd_series.isnull().any():
-                filled_edges_pd_series = current_univariate_pd_series.bfill().ffill()
-                if filled_edges_pd_series.isnull().any() and fill_all_nan_with is not None:
-                    print(f"[WARNING] Série univariada ainda tem NaNs residuais nas pontas. Preenchendo com {fill_all_nan_with}.")
-                    filled_edges_pd_series = filled_edges_pd_series.fillna(fill_all_nan_with)
-                ts_imputed = TimeSeries.from_series(filled_edges_pd_series, freq=ts_imputed_initial.freq_str, fill_missing_dates=True)
-            else:
-                ts_imputed = ts_imputed_initial
-
-    # Log final da razão de missing values
-    final_missing_values_count = 0
-    if len(ts_imputed) > 0: # Evitar divisão por zero se a série for vazia
-        # Acessa os valores como um array NumPy e soma os NaNs
-        final_missing_values_count = np.isnan(ts_imputed.values(copy=False)).sum()
-        total_values = len(ts_imputed) * ts_imputed.width
-        if total_values > 0:
-            final_ratio_missing_overall = final_missing_values_count / total_values
-            print(f"[INFO] Razão final de valores ausentes na TimeSeries imputada: {final_ratio_missing_overall * 100:.2f}% ({final_missing_values_count} NaNs)")
-        elif final_missing_values_count > 0 : # total_values é 0 mas há NaNs (série de comprimento 0 com largura > 0 e NaNs?)
-             print(f"[INFO] TimeSeries imputada tem {final_missing_values_count} NaNs mas comprimento total de valores é 0.")
-        else:
-             print("[INFO] TimeSeries imputada não tem valores ausentes e comprimento total de valores é 0.")
+        df_final = pd.concat(components_data, axis=1)
+        ts_imputed = TimeSeries.from_dataframe(df_final, freq=ts_imputed_initial.freq_str, fill_missing_dates=True)
 
     else:
-        print("[INFO] TimeSeries imputada está vazia.")
-        
+        # Univariada
+        values = ts_imputed_initial.values(copy=False)
+        comp_name = ts_imputed_initial.components[0]
+
+        if np.isnan(values).all():
+            if fill_all_nan_with is not None:
+                filled = pd.Series(fill_all_nan_with, index=ts_imputed_initial.time_index, name=comp_name)
+                ts_imputed = TimeSeries.from_series(filled, freq=ts_imputed_initial.freq_str, fill_missing_dates=True)
+            else:
+                ts_imputed = ts_imputed_initial
+        else:
+            filled = ts_imputed_initial.to_series().bfill().ffill()
+            if filled.isnull().any() and fill_all_nan_with is not None:
+                filled = filled.fillna(fill_all_nan_with)
+            ts_imputed = TimeSeries.from_series(filled, freq=ts_imputed_initial.freq_str, fill_missing_dates=True)
+
     return ts_imputed

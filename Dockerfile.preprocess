@@ -11,15 +11,15 @@ COPY setup.py pyproject.toml /app/
 COPY requirements.preprocess.txt /app/
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.preprocess.txt
 
-# Install the pipeline_5g package in editable mode
-RUN pip install -e . --use-pep517
-
 # Copy datasets to preprocess
 COPY ./datasets /app/datasets
 
 # Copy preprocessing script
 COPY ./src /app
 COPY ./pipeline_5g /app/pipeline_5g
+
+# Install the pipeline_5g package in editable mode
+RUN pip install -e . --use-pep517
 
 # Command to run the preprocessing script
 CMD ["python3", "prepare_dataset.py"]

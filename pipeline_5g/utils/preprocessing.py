@@ -22,8 +22,7 @@ def preprocess_5G_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     ]
     cleaned = df.drop(cols_to_drop, axis=1)
 
-    # Convert unkown string to datetime64
-    # add TZ +1000 for Dublin, Ireland UTC
+    # Converter string de data para datetime64
     cleaned["Timestamp"] = (
         cleaned["Timestamp"]
         .apply(
@@ -33,23 +32,24 @@ def preprocess_5G_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         .astype("datetime64[ns]")
     )
 
-    # Rename '-' to NaN values
+    # Substituir "-" por NaN
     cleaned[["RSRQ", "SNR", "CQI", "RSSI"]] = cleaned[
         ["RSRQ", "SNR", "CQI", "RSSI"]
     ].replace("-", np.nan)
 
-    # Change objects columns to int64 dtype
-    # cleaned[["RSRQ","SNR","CQI", "RSSI"]] = cleaned[["RSRQ","SNR","CQI", "RSSI"]].astype(float).astype('Int64')
-
-    # Convert selected columns to float
+    # Converter colunas métricas para float
     metric_columns = ["RSRP", "RSRQ", "SNR", "CQI", "RSSI", "DL_bitrate", "UL_bitrate", "Speed"]
     cleaned[metric_columns] = cleaned[metric_columns].astype(float)
 
-    # Configurar a coluna de data/hora como índice
+    # Conversão de DL/UL bitrate de kbps para Mbps
+    cleaned["DL_bitrate"] = cleaned["DL_bitrate"] / 1000
+    cleaned["UL_bitrate"] = cleaned["UL_bitrate"] / 1000
+
+    # Definir timestamp como índice
     cleaned = cleaned.set_index("Timestamp")
 
+    # Remover duplicatas por Uid
     cleaned_dfs = []
-
     for uid in cleaned.Uid.unique():
         df_uid = cleaned[cleaned.Uid == uid]
         df_uid = df_uid[~df_uid.index.duplicated(keep="first")]

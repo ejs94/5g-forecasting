@@ -20,19 +20,17 @@ RUN apt-get update && \
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Instala pip e ferramentas de build
-RUN pip install --upgrade pip setuptools wheel
-
 # Instala as bibliotecas do Python necessárias, incluindo Darts
 COPY requirements.cpu.txt /app/
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.cpu.txt
+RUN pip install --upgrade pip setuptools wheel && pip install --no-cache-dir -r requirements.cpu.txt
 
 # Copia o código fonte para o contêiner
 COPY ./src /app
 COPY ./pipeline_5g /app/pipeline_5g
 
 # Install the pipeline_5g package in editable mode
-RUN pip install -e . --use-pep517
+RUN pip install -e /app
+# --use-pep517
 
 # Define o comando padrão ao iniciar o contêiner
-CMD ["python3", "train_models_covariates.py"]
+# CMD ["python3", "train_models_covariates.py"]

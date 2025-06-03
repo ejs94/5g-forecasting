@@ -1,5 +1,8 @@
-import torch
 import multiprocessing
+
+import torch
+from pytorch_lightning.callbacks import TQDMProgressBar
+
 
 def get_torch_device_config(verbose: bool = True) -> dict:
     """
@@ -17,7 +20,14 @@ def get_torch_device_config(verbose: bool = True) -> dict:
     if torch.cuda.is_available():
         if verbose:
             print("GPU detectada. Usando PyTorch com acelerador GPU.")
-        return {"pl_trainer_kwargs": {"accelerator": "gpu", "devices": [0]}}
+        return {
+            "pl_trainer_kwargs": {
+                "accelerator": "gpu",
+                "devices": [0],
+                "callbacks": [TQDMProgressBar()],
+                "enable_progress_bar": True,
+            }
+        }
 
     else:
         num_threads = multiprocessing.cpu_count()
@@ -25,6 +35,14 @@ def get_torch_device_config(verbose: bool = True) -> dict:
         torch.set_num_interop_threads(num_threads)
 
         if verbose:
-            print(f"GPU não detectada. Configurando PyTorch para usar CPU com {num_threads} threads.")
+            print(
+                f"GPU não detectada. Configurando PyTorch para usar CPU com {num_threads} threads."
+            )
 
-        return {"pl_trainer_kwargs": {"accelerator": "cpu"}}
+        return {
+            "pl_trainer_kwargs": {
+                "accelerator": "cpu",
+                "callbacks": [TQDMProgressBar()],
+                "enable_progress_bar": True,
+            }
+        }

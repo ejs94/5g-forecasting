@@ -1,7 +1,7 @@
 import os
 import pickle
 import time
-import warnings
+import numpy as np
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,11 +10,8 @@ from darts.dataprocessing.transformers import Scaler
 from darts.metrics import mae, mape, rmse
 from darts.models import LinearRegressionModel, NBEATSModel
 from darts.utils.model_selection import train_test_split
-from tqdm.auto import tqdm
 
-from pipeline_5g.utils import get_torch_device_config, save_historical_forecast_results
-
-warnings.filterwarnings("ignore")
+from pipeline_5g.utils import get_torch_device_config
 
 # Detecta e configura o uso de GPU ou CPU
 print("---Verificando disponibilidade de GPU/CPU---")
@@ -69,76 +66,18 @@ predict_horizon = 10
 
 # TODO: Adicionar os naive global
 
-# --- Linear Regression ---
+# Linear Regression
 
-# model = LinearRegressionModel(lags=10, lags_past_covariates=10)
-# model_name = model.__class__.__name__
-# model_output = os.path.join(models_trained_path, f"{model_name}.pth")
-
-# print(f"\n--- Treinando modelo {model_name} com a parte inicial de treino ---")
-
-# start_fit_time = time.time()
-# model.fit(train_ts, past_covariates=train_past_covariates_ts)
-# fit_elapsed_time = time.time() - start_fit_time
-
-# print(f"Modelo {model_name} treinado em {fit_elapsed_time:.2f}s")
-
-# # Salva o modelo treinado
-# model.save(model_output)
-# print(f"Modelo salvo em: {model_output}")
-
-# print(f"\n--- Realizando Historical Forecasts (Backtesting) em {model_name} ---")
-
-# start_hf_time = time.time()
-# historical_preds_scaled = model.historical_forecasts(
-#     series=target_ts_scaled,  # Lista de TODAS as séries alvo escaladas
-#     past_covariates=past_covariates_ts_scaled, # Lista de TODAS as covariáveis passadas escaladas
-#     start=0.8,              # Começa a prever após 80% de cada série
-#     forecast_horizon=predict_horizon,
-#     stride=1,               # Faz uma nova previsão a cada passo no período de teste
-#     retrain=False,          # USA O MODELO JÁ TREINADO GLOBALMENTE
-#     verbose=True,
-#     show_warnings=True
-# )
-# hf_elapsed_time = time.time() - start_hf_time
-
-# print(f"Historical forecasts gerados em {hf_elapsed_time:.2f}s")
-
-# historical_preds_unscaled = scaler_output.inverse_transform(historical_preds_scaled)
-
-# save_historical_forecast_results(
-#     model_name=model_name,
-#     historical_preds_unscaled=historical_preds_unscaled,
-#     all_targets_cleaned=all_targets_cleaned,
-#     fit_elapsed_time=fit_elapsed_time,
-#     hf_elapsed_time=hf_elapsed_time,
-#     results_path=results_path,
-#     mode="covariate"  # ou "univariate"
-# )
-
-
-# --- NBEATS ---
-
-model = NBEATSModel(
-    input_chunk_length=10,
-    output_chunk_length=10,
-    generic_architecture=True,
-    num_stacks=10,
-    num_blocks=1,
-    num_layers=4,
-    layer_widths=512,
-    batch_size=64,
-    n_epochs=100,
-    **torch_kwargs,
-)
-
+model = LinearRegressionModel(lags=10, lags_past_covariates=10)
 model_name = model.__class__.__name__
-model_output = os.path.join(models_trained_path, f"{model_name}.pth")
+model_output = os.path.join(models_trained_path, f"{model_name}_model.pth")
+
+# Início do treinamento INICIAL do modelo
 
 print(f"\n--- Treinando modelo {model_name} com a parte inicial de treino ---")
 
 start_fit_time = time.time()
-model.fit(train_ts, past_covariates=train_past_covariates_ts, verbose=True)
+model.fit(train_ts, past_covariates=train_past_covariates_ts)
 fit_elapsed_time = time.time() - start_fit_time
 
 print(f"Modelo {model_name} treinado em {fit_elapsed_time:.2f}s")
@@ -146,6 +85,8 @@ print(f"Modelo {model_name} treinado em {fit_elapsed_time:.2f}s")
 # Salva o modelo treinado
 model.save(model_output)
 print(f"Modelo salvo em: {model_output}")
+
+# --- AVALIAÇÃO USANDO HISTORICAL FORECASTS ---
 
 print(f"\n--- Realizando Historical Forecasts (Backtesting) em {model_name} ---")
 
@@ -166,30 +107,38 @@ print(f"Historical forecasts gerados em {hf_elapsed_time:.2f}s")
 
 historical_preds_unscaled = scaler_output.inverse_transform(historical_preds_scaled)
 
-save_historical_forecast_results(
-    model_name=model_name,
-    historical_preds_unscaled=historical_preds_unscaled,
-    all_targets_cleaned=all_targets_cleaned,
-    fit_elapsed_time=fit_elapsed_time,
-    hf_elapsed_time=hf_elapsed_time,
-    results_path=results_path,
-    mode="covariate"  # ou "univariate"
-)
 
+##### Código em teste
 
+# Estrutura para armazenar resultados por série
+results_rows = []
 
+# Loop pelas séries (assumindo que a ordem é a mesma entre as listas)
+for i in range(len(historical_preds_unscaled)):
+    preds = historical_preds_unscaled[i]
+    actuals = all_targets_cleaned[i]
+    
+    # Alinhar as séries: mesmo índice da previsão
+    actuals_aligned = actuals.slice_intersect(preds)
 
+    results_rows.append({
+        "Model": model_name,
+        "Series_id": i,
+        "Fit_elapsed_time": fit_elapsed_time,
+        "Historical_Forecast_elapsed_time": hf_elapsed_time,
+        "Actuals_index": actuals_aligned.to_dataframe().index.to_numpy(),
+        "Actuals_values": actuals_aligned.to_dataframe().values.flatten(),
+        "Preds_index": preds.to_dataframe().index.to_numpy(),
+        "Preds_values": preds.to_dataframe().values.flatten()
+    })
 
+# Cria um DataFrame consolidado
+results_df = pd.DataFrame(results_rows)
 
-
-
-
-
-
-
-
-
-
+# Salva em formato parquet (mais eficiente para arrays)
+results_file = os.path.join(results_path, f"{model_name}_historical_forecast.parquet")
+results_df.to_parquet(results_file, compression="gzip")
+print(f"Resultados salvos em: {results_file}")
 
 
 # # Filtrar séries para as quais não foi possível gerar previsões (se houver Nones)
@@ -214,6 +163,10 @@ save_historical_forecast_results(
 
 # print(f"  MAE Mean:  {np.mean(mae_overall)}")
 # print(f"  RMSE Mean: {np.mean(rmse_overall)}")
+
+
+
+
 
 # try:
 #     mape_overall = mape(valid_actuals_for_metrics, valid_preds_for_metrics)

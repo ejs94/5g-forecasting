@@ -59,3 +59,55 @@ def load_or_create_config(config_path):
             json.dump(config, f, indent=4)
         print(f"Configuração inicial salva em: {config_path}")
     return config
+
+def save_historical_forecast_results(
+    model_name: str,
+    historical_preds_unscaled: list,
+    all_targets_cleaned: list,
+    fit_elapsed_time: float,
+    hf_elapsed_time: float,
+    results_path: str,
+    mode: str = "covariate"
+) -> str:
+    """
+    Salva os resultados das previsões históricas em formato parquet.
+
+    Args:
+        model_name (str): Nome do modelo.
+        historical_preds_unscaled (list): Lista de previsões desscaladas (TimeSeries).
+        all_targets_cleaned (list): Lista de séries reais (TimeSeries).
+        fit_elapsed_time (float): Tempo gasto no treinamento.
+        hf_elapsed_time (float): Tempo gasto na previsão histórica.
+        results_path (str): Caminho para salvar o arquivo de resultados.
+        mode (str): "univariate" ou "covariate", usado como prefixo no nome do arquivo.
+
+    Returns:
+        str: Caminho completo para o arquivo salvo.
+    """
+    results_rows = []
+
+    for i in range(len(historical_preds_unscaled)):
+        preds = historical_preds_unscaled[i]
+        actuals = all_targets_cleaned[i]
+        actuals_aligned = actuals.slice_intersect(preds)
+
+        results_rows.append({
+            "Model": model_name,
+            "Series_id": i,
+            "Fit_elapsed_time": fit_elapsed_time,
+            "Historical_Forecast_elapsed_time": hf_elapsed_time,
+            "Actuals_index": actuals_aligned.to_dataframe().index.to_numpy(),
+            "Actuals_values": actuals_aligned.to_dataframe().values.flatten(),
+            "Preds_index": preds.to_dataframe().index.to_numpy(),
+            "Preds_values": preds.to_dataframe().values.flatten()
+        })
+
+    results_df = pd.DataFrame(results_rows)
+    os.makedirs(results_path, exist_ok=True)
+
+    prefix = f"{mode.lower()}_" if mode else ""
+    results_file = os.path.join(results_path, f"{prefix}{model_name}_historical_forecast.parquet")
+
+    results_df.to_parquet(results_file, compression="gzip")
+    print(f"Resultados salvos em: {results_file}")
+    return results_file

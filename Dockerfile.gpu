@@ -4,6 +4,9 @@ FROM nvidia/cuda:12.5.0-runtime-ubuntu22.04
 # Define o diretório de trabalho
 WORKDIR /app
 
+# Copy setup.py and pyproject.toml to install package in editable mode
+COPY setup.py pyproject.toml /app/
+
 # Instala dependências necessárias
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -18,14 +21,15 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Instala as bibliotecas do Python necessárias, incluindo Darts e PyTorch com suporte à GPU
 COPY requirements.gpu.txt /app/
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.gpu.txt
+RUN pip install --upgrade pip setuptools wheel && pip install --no-cache-dir -r requirements.gpu.txt
 
 # Copia o código fonte para o contêiner
 COPY ./src /app
 COPY ./pipeline_5g /app/pipeline_5g
 
 # Install the pipeline_5g package in editable mode
-RUN pip install -e . --use-pep517
+RUN pip install -e /app
+# --use-pep517
 
 # Define o comando padrão ao iniciar o contêiner
 CMD ["python3", "train_models_covariates.py"]

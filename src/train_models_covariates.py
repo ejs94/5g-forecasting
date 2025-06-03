@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from darts.dataprocessing.transformers import Scaler
 from darts.metrics import mae, mape, rmse
-from darts.models import LinearRegressionModel, NBEATSModel
+from darts.models import BlockRNNModel, LinearRegressionModel, NBEATSModel, TransformerModel
 from darts.utils.model_selection import train_test_split
 from tqdm.auto import tqdm
 
@@ -71,50 +71,50 @@ predict_horizon = 10
 
 # --- Linear Regression ---
 
-# model = LinearRegressionModel(lags=10, lags_past_covariates=10)
-# model_name = model.__class__.__name__
-# model_output = os.path.join(models_trained_path, f"{model_name}.pth")
+model = LinearRegressionModel(lags=10, lags_past_covariates=10)
+model_name = model.__class__.__name__
+model_output = os.path.join(models_trained_path, f"{model_name}.pth")
 
-# print(f"\n--- Treinando modelo {model_name} com a parte inicial de treino ---")
+print(f"\n--- Treinando modelo {model_name} com a parte inicial de treino ---")
 
-# start_fit_time = time.time()
-# model.fit(train_ts, past_covariates=train_past_covariates_ts)
-# fit_elapsed_time = time.time() - start_fit_time
+start_fit_time = time.time()
+model.fit(train_ts, past_covariates=train_past_covariates_ts)
+fit_elapsed_time = time.time() - start_fit_time
 
-# print(f"Modelo {model_name} treinado em {fit_elapsed_time:.2f}s")
+print(f"Modelo {model_name} treinado em {fit_elapsed_time:.2f}s")
 
-# # Salva o modelo treinado
-# model.save(model_output)
-# print(f"Modelo salvo em: {model_output}")
+# Salva o modelo treinado
+model.save(model_output)
+print(f"Modelo salvo em: {model_output}")
 
-# print(f"\n--- Realizando Historical Forecasts (Backtesting) em {model_name} ---")
+print(f"\n--- Realizando Historical Forecasts (Backtesting) em {model_name} ---")
 
-# start_hf_time = time.time()
-# historical_preds_scaled = model.historical_forecasts(
-#     series=target_ts_scaled,  # Lista de TODAS as séries alvo escaladas
-#     past_covariates=past_covariates_ts_scaled, # Lista de TODAS as covariáveis passadas escaladas
-#     start=0.8,              # Começa a prever após 80% de cada série
-#     forecast_horizon=predict_horizon,
-#     stride=1,               # Faz uma nova previsão a cada passo no período de teste
-#     retrain=False,          # USA O MODELO JÁ TREINADO GLOBALMENTE
-#     verbose=True,
-#     show_warnings=True
-# )
-# hf_elapsed_time = time.time() - start_hf_time
+start_hf_time = time.time()
+historical_preds_scaled = model.historical_forecasts(
+    series=target_ts_scaled,  # Lista de TODAS as séries alvo escaladas
+    past_covariates=past_covariates_ts_scaled, # Lista de TODAS as covariáveis passadas escaladas
+    start=0.8,              # Começa a prever após 80% de cada série
+    forecast_horizon=predict_horizon,
+    stride=1,               # Faz uma nova previsão a cada passo no período de teste
+    retrain=False,          # USA O MODELO JÁ TREINADO GLOBALMENTE
+    verbose=True,
+    show_warnings=True
+)
+hf_elapsed_time = time.time() - start_hf_time
 
-# print(f"Historical forecasts gerados em {hf_elapsed_time:.2f}s")
+print(f"Historical forecasts gerados em {hf_elapsed_time:.2f}s")
 
-# historical_preds_unscaled = scaler_output.inverse_transform(historical_preds_scaled)
+historical_preds_unscaled = scaler_output.inverse_transform(historical_preds_scaled)
 
-# save_historical_forecast_results(
-#     model_name=model_name,
-#     historical_preds_unscaled=historical_preds_unscaled,
-#     all_targets_cleaned=all_targets_cleaned,
-#     fit_elapsed_time=fit_elapsed_time,
-#     hf_elapsed_time=hf_elapsed_time,
-#     results_path=results_path,
-#     mode="covariate"  # ou "univariate"
-# )
+save_historical_forecast_results(
+    model_name=model_name,
+    historical_preds_unscaled=historical_preds_unscaled,
+    all_targets_cleaned=all_targets_cleaned,
+    fit_elapsed_time=fit_elapsed_time,
+    hf_elapsed_time=hf_elapsed_time,
+    results_path=results_path,
+    mode="covariate"  # ou "univariate"
+)
 
 
 # --- NBEATS ---
@@ -177,18 +177,115 @@ save_historical_forecast_results(
 )
 
 
+# --- Block RNN ---
 
 
+model = BlockRNNModel(
+    input_chunk_length=10,
+    output_chunk_length=10,
+    model="LSTM",
+    n_rnn_layers=4,
+    n_epochs=100,
+    **torch_kwargs,
+)
+
+model_name = model.__class__.__name__
+model_output = os.path.join(models_trained_path, f"{model_name}.pth")
+
+print(f"\n--- Treinando modelo {model_name} com a parte inicial de treino ---")
+
+start_fit_time = time.time()
+model.fit(train_ts, past_covariates=train_past_covariates_ts, verbose=True)
+fit_elapsed_time = time.time() - start_fit_time
+
+print(f"Modelo {model_name} treinado em {fit_elapsed_time:.2f}s")
+
+# Salva o modelo treinado
+model.save(model_output)
+print(f"Modelo salvo em: {model_output}")
+
+print(f"\n--- Realizando Historical Forecasts (Backtesting) em {model_name} ---")
+
+start_hf_time = time.time()
+historical_preds_scaled = model.historical_forecasts(
+    series=target_ts_scaled,  # Lista de TODAS as séries alvo escaladas
+    past_covariates=past_covariates_ts_scaled, # Lista de TODAS as covariáveis passadas escaladas
+    start=0.8,              # Começa a prever após 80% de cada série
+    forecast_horizon=predict_horizon,
+    stride=1,               # Faz uma nova previsão a cada passo no período de teste
+    retrain=False,          # USA O MODELO JÁ TREINADO GLOBALMENTE
+    verbose=True,
+    show_warnings=True
+)
+hf_elapsed_time = time.time() - start_hf_time
+
+print(f"Historical forecasts gerados em {hf_elapsed_time:.2f}s")
+
+historical_preds_unscaled = scaler_output.inverse_transform(historical_preds_scaled)
+
+save_historical_forecast_results(
+    model_name=model_name,
+    historical_preds_unscaled=historical_preds_unscaled,
+    all_targets_cleaned=all_targets_cleaned,
+    fit_elapsed_time=fit_elapsed_time,
+    hf_elapsed_time=hf_elapsed_time,
+    results_path=results_path,
+    mode="covariate"  # ou "univariate"
+)
 
 
+# --- Transformer Model ---
 
+model = TransformerModel(
+    input_chunk_length=10,
+    output_chunk_length=10,
+    n_epochs=100,
+    **torch_kwargs,
+)
 
+model_name = model.__class__.__name__
+model_output = os.path.join(models_trained_path, f"{model_name}.pth")
 
+print(f"\n--- Treinando modelo {model_name} com a parte inicial de treino ---")
 
+start_fit_time = time.time()
+model.fit(train_ts, past_covariates=train_past_covariates_ts, verbose=True)
+fit_elapsed_time = time.time() - start_fit_time
 
+print(f"Modelo {model_name} treinado em {fit_elapsed_time:.2f}s")
 
+# Salva o modelo treinado
+model.save(model_output)
+print(f"Modelo salvo em: {model_output}")
 
+print(f"\n--- Realizando Historical Forecasts (Backtesting) em {model_name} ---")
 
+start_hf_time = time.time()
+historical_preds_scaled = model.historical_forecasts(
+    series=target_ts_scaled,  # Lista de TODAS as séries alvo escaladas
+    past_covariates=past_covariates_ts_scaled, # Lista de TODAS as covariáveis passadas escaladas
+    start=0.8,              # Começa a prever após 80% de cada série
+    forecast_horizon=predict_horizon,
+    stride=1,               # Faz uma nova previsão a cada passo no período de teste
+    retrain=False,          # USA O MODELO JÁ TREINADO GLOBALMENTE
+    verbose=True,
+    show_warnings=True
+)
+hf_elapsed_time = time.time() - start_hf_time
+
+print(f"Historical forecasts gerados em {hf_elapsed_time:.2f}s")
+
+historical_preds_unscaled = scaler_output.inverse_transform(historical_preds_scaled)
+
+save_historical_forecast_results(
+    model_name=model_name,
+    historical_preds_unscaled=historical_preds_unscaled,
+    all_targets_cleaned=all_targets_cleaned,
+    fit_elapsed_time=fit_elapsed_time,
+    hf_elapsed_time=hf_elapsed_time,
+    results_path=results_path,
+    mode="covariate"  # ou "univariate"
+)
 
 
 

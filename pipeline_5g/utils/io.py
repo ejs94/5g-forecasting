@@ -62,32 +62,42 @@ def load_or_create_config(config_path):
 
 def save_historical_forecast_results(
     model_name: str,
-    historical_preds_unscaled: list,
-    all_targets_cleaned: list,
+    historical_preds_unscaled: List[TimeSeries],
+    all_targets_cleaned: List[TimeSeries],
     fit_elapsed_time: float,
     hf_elapsed_time: float,
     results_path: str,
     mode: str = "covariate"
 ) -> str:
     """
-    Salva os resultados das previsões históricas em formato parquet.
+    Salva os resultados das previsões históricas em formato Parquet.
 
-    Args:
-        model_name (str): Nome do modelo.
-        historical_preds_unscaled (list): Lista de previsões desscaladas (TimeSeries).
-        all_targets_cleaned (list): Lista de séries reais (TimeSeries).
-        fit_elapsed_time (float): Tempo gasto no treinamento.
-        hf_elapsed_time (float): Tempo gasto na previsão histórica.
-        results_path (str): Caminho para salvar o arquivo de resultados.
-        mode (str): "univariate" ou "covariate", usado como prefixo no nome do arquivo.
+    Parâmetros:
+    ------------
+    model_name : str
+        Nome da classe do modelo.
+    historical_preds_unscaled : List[TimeSeries]
+        Lista de séries previstas (não normalizadas).
+    all_targets_cleaned : List[TimeSeries]
+        Lista de séries reais (não normalizadas).
+    fit_elapsed_time : float
+        Tempo total de treino do modelo (em segundos).
+    hf_elapsed_time : float
+        Tempo total gasto para gerar os forecasts históricos (em segundos).
+    results_path : str
+        Caminho onde os resultados serão salvos.
+    mode : str, opcional
+        Define o tipo de modelo: "covariate" (padrão) ou "univariate".
+        Utilizado como prefixo no nome do arquivo salvo.
 
-    Returns:
-        str: Caminho completo para o arquivo salvo.
+    Retorna:
+    --------
+    str
+        Caminho completo para o arquivo Parquet salvo.
     """
     results_rows = []
 
-    for i in range(len(historical_preds_unscaled)):
-        preds = historical_preds_unscaled[i]
+    for i, preds in enumerate(historical_preds_unscaled):
         actuals = all_targets_cleaned[i]
         actuals_aligned = actuals.slice_intersect(preds)
 
@@ -96,10 +106,10 @@ def save_historical_forecast_results(
             "Series_id": i,
             "Fit_elapsed_time": fit_elapsed_time,
             "Historical_Forecast_elapsed_time": hf_elapsed_time,
-            "Actuals_index": actuals_aligned.to_dataframe().index.to_numpy(),
-            "Actuals_values": actuals_aligned.to_dataframe().values.flatten(),
-            "Preds_index": preds.to_dataframe().index.to_numpy(),
-            "Preds_values": preds.to_dataframe().values.flatten()
+            "Actuals_index": actuals_aligned.time_index,
+            "Actuals_values": actuals_aligned.values().flatten(),
+            "Preds_index": preds.time_index,
+            "Preds_values": preds.values().flatten()
         })
 
     results_df = pd.DataFrame(results_rows)
@@ -107,7 +117,7 @@ def save_historical_forecast_results(
 
     prefix = f"{mode.lower()}_" if mode else ""
     results_file = os.path.join(results_path, f"{prefix}{model_name}_historical_forecast.parquet")
-
     results_df.to_parquet(results_file, compression="gzip")
+
     print(f"Resultados salvos em: {results_file}")
     return results_file

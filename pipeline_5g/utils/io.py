@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 import shortuuid
+from darts import TimeSeries
 
 
 def extract_5G_dataset(path: os.path) -> list[pd.DataFrame]:
@@ -62,8 +63,8 @@ def load_or_create_config(config_path):
 
 def save_historical_forecast_results(
     model_name: str,
-    historical_preds_unscaled: List[TimeSeries],
-    all_targets_cleaned: List[TimeSeries],
+    historical_preds_unscaled: list[TimeSeries],
+    all_targets_cleaned: list[TimeSeries],
     fit_elapsed_time: float,
     hf_elapsed_time: float,
     results_path: str,
@@ -106,10 +107,10 @@ def save_historical_forecast_results(
             "Series_id": i,
             "Fit_elapsed_time": fit_elapsed_time,
             "Historical_Forecast_elapsed_time": hf_elapsed_time,
-            "Actuals_index": actuals_aligned.time_index,
-            "Actuals_values": actuals_aligned.values().flatten(),
-            "Preds_index": preds.time_index,
-            "Preds_values": preds.values().flatten()
+            "Actuals_index": list(actuals_aligned.time_index),
+            "Actuals_values": actuals_aligned.values().flatten().tolist(),
+            "Preds_index": list(preds.time_index),
+            "Preds_values": preds.values().flatten().tolist()
         })
 
     results_df = pd.DataFrame(results_rows)

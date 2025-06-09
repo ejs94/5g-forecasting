@@ -115,4 +115,8 @@ def walk_forward_validation(
     hf_elapsed_time = time.time() - start_hf_time
     print(f"Forecasts concluídos em {hf_elapsed_time:.2f}s")
 
+    if not historical_preds_scaled:
+        raise ValueError(f"Nenhuma previsão histórica foi gerada por {model.__class__.__name__}. "
+                     f"Verifique se o modelo é compatível com múltiplas séries e se os parâmetros são válidos.")
+
     return historical_preds_scaled, hf_elapsed_time

@@ -1,13 +1,14 @@
 import os
 import pickle
 import time
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
 from darts.dataprocessing.transformers import Scaler
-from darts.models import ExponentialSmoothing  # ou outro modelo local
+from darts.models import ExponentialSmoothing, NaiveMean  # ou outro modelo local
 from darts.utils.model_selection import train_test_split
+from darts.utils.utils import ModelMode, SeasonalityMode
 
 from pipeline_5g.utils import get_torch_device_config, save_historical_forecast_results
 
@@ -45,11 +46,17 @@ all_preds = []
 fit_times = []
 hf_times = []
 
-model_name = "ExponentialSmoothing"
 
 for i, series in enumerate(train_ts):
     print(f"\n--- Treinando modelo local para série {i} ---")
-    model = ExponentialSmoothing()
+    # model = ExponentialSmoothing(
+    #     trend=ModelMode.NONE, 
+    #     damped=False, 
+    #     seasonal=SeasonalityMode.NONE, 
+    #     seasonal_periods=None, 
+    #     random_state=0,
+    # )
+    model = NaiveMean()
 
     start_fit = time.time()
     model.fit(series)
@@ -62,7 +69,7 @@ for i, series in enumerate(train_ts):
         start=0.8,
         forecast_horizon=predict_horizon,
         stride=1,
-        retrain=False,
+        retrain=True,
         verbose=True
     )
     hf_elapsed = time.time() - start_hf
@@ -72,6 +79,7 @@ for i, series in enumerate(train_ts):
     hf_times.append(hf_elapsed)
 
 # Desscala todas as previsões
+model_name = model.__class__.__name__
 historical_preds_unscaled = scaler_target.inverse_transform(all_preds)
 
 # Exporta resultados

@@ -52,8 +52,13 @@ def train_time_series_model(
     fit_elapsed_time = time.time() - start_fit_time
     print(f"Modelo {model_name} treinado em {fit_elapsed_time:.2f}s")
 
-    model.save(model_output)
-    print(f"Modelo salvo em: {model_output}")
+    try:
+        model.save(model_output)
+        print(f"Modelo salvo em: {model_output}")
+    except AttributeError as e:
+        print(f"[AVISO] Falha ao salvar o modelo {model_name}: {e}")
+    except Exception as e:
+        print(f"[ERRO] Erro inesperado ao salvar o modelo {model_name}: {e}")
 
     return model, fit_elapsed_time, model_name
 

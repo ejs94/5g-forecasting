@@ -1,0 +1,86 @@
+import os
+import pickle
+import time
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from darts.dataprocessing.transformers import Scaler
+from darts.models import ExponentialSmoothing  # ou outro modelo local
+from darts.utils.model_selection import train_test_split
+
+from pipeline_5g.utils import get_torch_device_config, save_historical_forecast_results
+
+# ======================= MAIN =======================
+
+print("---Verificando disponibilidade de GPU/CPU---")
+torch_kwargs = get_torch_device_config()
+
+print("---Carregando os dados 5G Dataset---")
+
+base_data_path = os.path.join(os.curdir, "data")
+processed_timeseries_path = os.path.join(base_data_path, "processed_timeseries")
+
+results_path = os.path.join(base_data_path, "results")
+os.makedirs(results_path, exist_ok=True)
+
+models_trained_path = os.path.join(results_path, "models_trained")
+os.makedirs(models_trained_path, exist_ok=True)
+
+try:
+    with open(os.path.join(processed_timeseries_path, "processed_targets.pkl"), "rb") as f:
+        all_targets_cleaned = pickle.load(f)
+except FileNotFoundError:
+    print("ERRO: Arquivos de dados processados não encontrados. Verifique os caminhos.")
+    exit()
+
+scaler_target = Scaler()
+target_ts_scaled = scaler_target.fit_transform(all_targets_cleaned)
+
+train_ts, _ = train_test_split(target_ts_scaled, test_size=0.2, axis=1)
+predict_horizon = 10
+
+# Lista para guardar resultados
+all_preds = []
+fit_times = []
+hf_times = []
+
+model_name = "ExponentialSmoothing"
+
+for i, series in enumerate(train_ts):
+    print(f"\n--- Treinando modelo local para série {i} ---")
+    model = ExponentialSmoothing()
+
+    start_fit = time.time()
+    model.fit(series)
+    fit_elapsed = time.time() - start_fit
+
+    print(f"--- Validando (historical_forecast) para série {i} ---")
+    start_hf = time.time()
+    preds = model.historical_forecasts(
+        series=target_ts_scaled[i],
+        start=0.8,
+        forecast_horizon=predict_horizon,
+        stride=1,
+        retrain=False,
+        verbose=True
+    )
+    hf_elapsed = time.time() - start_hf
+
+    all_preds.append(preds)
+    fit_times.append(fit_elapsed)
+    hf_times.append(hf_elapsed)
+
+# Desscala todas as previsões
+historical_preds_unscaled = scaler_target.inverse_transform(all_preds)
+
+# Exporta resultados
+save_historical_forecast_results(
+    model_name=model_name,
+    historical_preds_unscaled=historical_preds_unscaled,
+    all_targets_cleaned=all_targets_cleaned,
+    fit_elapsed_time=np.mean(fit_times),
+    hf_elapsed_time=np.mean(hf_times),
+    results_path=results_path,
+    mode="local_univariate"
+)

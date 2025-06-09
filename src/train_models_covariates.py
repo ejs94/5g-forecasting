@@ -117,16 +117,31 @@ output_chunk_length = 10
 # --- Deep Learning Based Models ---
 # Covariates: RSRP, RSRQ, SNR, RSSI, Speed
 
-model = BlockRNNModel(
+# model = BlockRNNModel(
+#     input_chunk_length=input_chunk_length,
+#     output_chunk_length=output_chunk_length,
+#     model="LSTM",
+#     hidden_dim=64,
+#     n_rnn_layers=2,
+#     hidden_fc_sizes=[64,32],
+#     dropout=0.2,
+#     activation="ReLU",
+#     batch_size=64,         
+#     n_epochs=100,                 
+#     **get_torch_device_config(),
+# )
+
+model = NBEATSModel(
     input_chunk_length=input_chunk_length,
     output_chunk_length=output_chunk_length,
-    model="LSTM",
-    hidden_dim=64,
-    n_rnn_layers=2,
-    hidden_fc_sizes=[64,32],
+    generic_architecture=True,
+    num_stacks=30,
+    num_blocks=1,
+    num_layers=4,
+    layer_widths=256,
+    expansion_coefficient_dim=5,
     dropout=0.2,
-    activation="ReLU",
-    batch_size=64,         
+    batch_size=128,         
     n_epochs=100,                 
     **get_torch_device_config(),
 )

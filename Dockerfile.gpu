@@ -32,4 +32,4 @@ RUN pip install -e /app
 # --use-pep517
 
 # Define o comando padrão ao iniciar o contêiner
-CMD ["python3", "train_models_covariates.py"]
+# CMD ["python3", "train_models_covariates.py"]

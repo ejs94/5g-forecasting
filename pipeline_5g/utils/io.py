@@ -1,6 +1,8 @@
 import glob
 import json
 import os
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -8,9 +10,26 @@ import shortuuid
 from darts import TimeSeries
 
 
-def extract_5G_dataset(path: os.path) -> list[pd.DataFrame]:
-    df_static = []
-    df_driving = []
+def extract_5G_dataset(path: Path) -> list[pd.DataFrame]:
+    """
+    Extrai e organiza datasets 5G a partir de arquivos CSV em um diretório.
+
+    Classifica os dados em duas categorias de mobilidade: "Static" e "Driving",
+    adiciona uma coluna de atividade do usuário baseada no nome do diretório
+    e inclui um identificador único por amostra.
+
+    Parâmetros:
+    -----------
+    path : Path
+        Caminho base contendo os arquivos CSV.
+
+    Retorna:
+    --------
+    list[pd.DataFrame]
+        Lista contendo dois DataFrames: [dados_estáticos, dados_em_movimento].
+    """
+    df_static: list[pd.DataFrame] = []
+    df_driving: list[pd.DataFrame] = []
 
     files = glob.glob(f"{path}/**/*.csv", recursive=True)
 
@@ -25,7 +44,7 @@ def extract_5G_dataset(path: os.path) -> list[pd.DataFrame]:
         if any(service in folder_name for service in streaming_services):
             df["User_Activity"] = "Streaming Video"
 
-        if ("Download") in folder_name:
+        if "Download" in folder_name:
             df["User_Activity"] = "Downloading a File"
 
         if "Static" in folder_name:
@@ -36,15 +55,25 @@ def extract_5G_dataset(path: os.path) -> list[pd.DataFrame]:
             df["Mobility"] = "Driving"
             df_driving.append(df)
 
-    df_static = pd.concat(df_static, axis=0, ignore_index=True)
-    df_driving = pd.concat(df_driving, axis=0, ignore_index=True)
+    df_static_concat = pd.concat(df_static, axis=0, ignore_index=True)
+    df_driving_concat = pd.concat(df_driving, axis=0, ignore_index=True)
 
-    return [df_static, df_driving]
+    return [df_static_concat, df_driving_concat]
 
 
-def load_or_create_config(config_path):
+def load_or_create_config(config_path: str) -> dict[str, Any]:
     """
-    Carrega a configuração do arquivo JSON ou cria uma configuração padrão.
+    Carrega configurações de um arquivo JSON ou cria configurações padrão.
+
+    Parâmetros:
+    -----------
+    config_path : str
+        Caminho do arquivo de configuração JSON.
+
+    Retorna:
+    --------
+    dict[str, Any]
+        Dicionário com os parâmetros de configuração.
     """
     if os.path.exists(config_path):
         with open(config_path, "r") as f:
@@ -61,6 +90,7 @@ def load_or_create_config(config_path):
         print(f"Configuração inicial salva em: {config_path}")
     return config
 
+
 def save_historical_forecast_results(
     model_name: str,
     historical_preds_unscaled: list[TimeSeries],
@@ -68,32 +98,21 @@ def save_historical_forecast_results(
     fit_elapsed_time: float,
     hf_elapsed_time: float,
     results_path: str,
-    mode: str = "covariate"
+    mode: str = ""
 ) -> str:
     """
     Salva os resultados das previsões históricas em formato Parquet.
 
-    Parâmetros:
-    ------------
-    model_name : str
-        Nome da classe do modelo.
-    historical_preds_unscaled : List[TimeSeries]
-        Lista de séries previstas (não normalizadas).
-    all_targets_cleaned : List[TimeSeries]
-        Lista de séries reais (não normalizadas).
-    fit_elapsed_time : float
-        Tempo total de treino do modelo (em segundos).
-    hf_elapsed_time : float
-        Tempo total gasto para gerar os forecasts históricos (em segundos).
-    results_path : str
-        Caminho onde os resultados serão salvos.
-    mode : str, opcional
-        Define o tipo de modelo: "covariate" (padrão) ou "univariate".
-        Utilizado como prefixo no nome do arquivo salvo.
+    Args:
+        model_name: Nome da classe do modelo.
+        historical_preds_unscaled: Lista de séries previstas (não normalizadas).
+        all_targets_cleaned: Lista de séries reais (não normalizadas).
+        fit_elapsed_time: Tempo total de treino do modelo (em segundos).
+        hf_elapsed_time: Tempo total gasto para gerar os forecasts históricos (em segundos).
+        results_path: Caminho onde os resultados serão salvos.
+        mode: Tipo de modelo: "covariate" (padrão) ou "univariate".
 
-    Retorna:
-    --------
-    str
+    Returns:
         Caminho completo para o arquivo Parquet salvo.
     """
     results_rows = []
@@ -107,9 +126,9 @@ def save_historical_forecast_results(
             "Series_id": i,
             "Fit_elapsed_time": fit_elapsed_time,
             "Historical_Forecast_elapsed_time": hf_elapsed_time,
-            "Actuals_index": list(actuals_aligned.time_index),
+            "Actuals_index": actuals_aligned.time_index.astype(str).tolist(),
             "Actuals_values": actuals_aligned.values().flatten().tolist(),
-            "Preds_index": list(preds.time_index),
+            "Preds_index": preds.time_index.astype(str).tolist(),
             "Preds_values": preds.values().flatten().tolist()
         })
 

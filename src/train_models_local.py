@@ -6,7 +6,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from darts.dataprocessing.transformers import Scaler
-from darts.models import ExponentialSmoothing, NaiveMean  # ou outro modelo local
+from darts.models import (
+    AutoARIMA,
+    ExponentialSmoothing,
+    NaiveMean,
+)
 from darts.utils.model_selection import train_test_split
 from darts.utils.utils import ModelMode, SeasonalityMode
 
@@ -29,7 +33,9 @@ models_trained_path = os.path.join(results_path, "models_trained")
 os.makedirs(models_trained_path, exist_ok=True)
 
 try:
-    with open(os.path.join(processed_timeseries_path, "processed_targets.pkl"), "rb") as f:
+    with open(
+        os.path.join(processed_timeseries_path, "processed_targets.pkl"), "rb"
+    ) as f:
         all_targets_cleaned = pickle.load(f)
 except FileNotFoundError:
     print("ERRO: Arquivos de dados processados não encontrados. Verifique os caminhos.")
@@ -49,15 +55,30 @@ hf_times = []
 
 for i, series in enumerate(train_ts):
     print(f"\n--- Treinando modelo local para série {i} ---")
+    #  --- Modelos Naives ---
+    # model = NaiveMean()
+    #  --- Modelos Simples ---
     # model = ExponentialSmoothing(
-    #     trend=ModelMode.NONE, 
-    #     damped=False, 
-    #     seasonal=SeasonalityMode.NONE, 
-    #     seasonal_periods=None, 
+    #     trend=ModelMode.NONE,
+    #     damped=False,
+    #     seasonal=SeasonalityMode.NONE,
+    #     seasonal_periods=None,
     #     random_state=0,
     # )
-    model = NaiveMean()
-
+    # --- Modelos Avançados ---
+    model = AutoARIMA(
+        start_p=0,                  # Valor inicial para o parâmetro AR (p) na busca stepwise
+        start_q=0,                  # Valor inicial para o parâmetro MA (q) na busca stepwise
+        max_p=5,                    # Valor máximo para o parâmetro AR (p)
+        max_q=5,                    # Valor máximo para o parâmetro MA (q)
+        d=None,                     # Deixa o modelo escolher automaticamente o número de diferenciações (d)
+        seasonal=False,             # Não considera componentes sazonais (SARIMA)
+        stepwise=True,              # Usa algoritmo stepwise para acelerar a seleção de modelos
+        suppress_warnings=True,     # Suprime avisos de convergência e outros durante a busca
+        error_action='ignore',      # Ignora erros de modelos inválidos ao invés de lançar exceções
+        n_jobs=-1,                  # Usa todos os núcleos disponíveis se `stepwise=False` e `parallel=True` (aqui, sem efeito)
+        trace=True                  # Mostra o progresso da busca: exibe modelos testados e critérios de avaliação (AIC, etc.)
+    )
     start_fit = time.time()
     model.fit(series)
     fit_elapsed = time.time() - start_fit
@@ -70,7 +91,7 @@ for i, series in enumerate(train_ts):
         forecast_horizon=predict_horizon,
         stride=1,
         retrain=True,
-        verbose=True
+        verbose=True,
     )
     hf_elapsed = time.time() - start_hf
 
@@ -90,5 +111,5 @@ save_historical_forecast_results(
     fit_elapsed_time=np.mean(fit_times),
     hf_elapsed_time=np.mean(hf_times),
     results_path=results_path,
-    mode="local_univariate"
+    mode="local_univariate",
 )

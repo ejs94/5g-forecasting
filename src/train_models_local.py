@@ -74,9 +74,9 @@ for i, series in enumerate(train_ts):
         d=None,                     # Deixa o modelo escolher automaticamente o número de diferenciações (d)
         seasonal=False,             # Não considera componentes sazonais (SARIMA)
         stepwise=True,              # Usa algoritmo stepwise para acelerar a seleção de modelos
-        suppress_warnings=True,     # Suprime avisos de convergência e outros durante a busca
-        error_action='ignore',      # Ignora erros de modelos inválidos ao invés de lançar exceções
-        n_jobs=-1,                  # Usa todos os núcleos disponíveis se `stepwise=False` e `parallel=True` (aqui, sem efeito)
+        # suppress_warnings=True,     # Suprime avisos de convergência e outros durante a busca
+        # error_action='ignore',      # Ignora erros de modelos inválidos ao invés de lançar exceções
+        # n_jobs=-1,                  # Usa todos os núcleos disponíveis se `stepwise=False` e `parallel=True` (aqui, sem efeito)
         trace=True                  # Mostra o progresso da busca: exibe modelos testados e critérios de avaliação (AIC, etc.)
     )
     start_fit = time.time()

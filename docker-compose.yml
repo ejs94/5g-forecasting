@@ -37,6 +37,40 @@ services:
     tty: true
     stdin_open: true # Opcional, mas frequentemente usado com tty: true
 
+  train-models-no-covariates-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all # Configura a visibilidade de todas as GPUs
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ./data:/app/data
+      - ./src:/app
+      - ./pipeline_5g:/app/pipeline_5g
+    command: python3 train_models_no_covariates.py
+    tty: true
+    stdin_open: true # Opcional, mas frequentemente usado com tty: true
+
+
+  train-models-locals-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    volumes:
+      - ./data:/app/data
+      - ./src:/app
+      - ./pipeline_5g:/app/pipeline_5g
+    command: python3 train_models_local.py
+
+
+
+
   all-models-sliding-window-cpu:
     build:
       context: .

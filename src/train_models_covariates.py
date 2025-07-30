@@ -4,12 +4,15 @@ import warnings
 
 from darts.dataprocessing.transformers import Scaler
 from darts.models import (
-    BlockRNNModel,
-    LightGBMModel,
+    # Regression Models
     LinearRegressionModel,
-    NBEATSModel,
-    NHiTSModel,
     RandomForest,
+    LightGBMModel,
+    # PyTorch (Lightning)-based Models
+    BlockRNNModel,
+    NBEATSModel,
+    # Not used in non covariates
+    NHiTSModel,
     TFTModel,
     TransformerModel,
 )
@@ -31,31 +34,28 @@ torch_kwargs = get_torch_device_config()
 
 print("---Carregando os dados 5G Dataset---")
 
-base_data_path = os.path.join(
-    os.curdir, "data"
-)  # Assumindo que 'data' está um nível acima do diretório do script
+base_data_path = os.path.join(os.curdir, "data")
 processed_timeseries_path = os.path.join(base_data_path, "processed_timeseries")
 
-results_path = os.path.join(
-    base_data_path, "results"
-)  # Caminho para salvar os resultados
+results_path = os.path.join(base_data_path, "results")
 os.makedirs(results_path, exist_ok=True)
 
-models_trained_path = os.path.join(
-    base_data_path, "results", "models_trained"
-)  # Caminho para salvar os resultados
+models_trained_path = os.path.join(base_data_path, "results", "models_trained")
 os.makedirs(models_trained_path, exist_ok=True)
 
 try:
+    # Load target
     with open(
         os.path.join(processed_timeseries_path, "processed_targets.pkl"), "rb"
     ) as f:
         all_targets_cleaned = pickle.load(f)
 
+    # Load covariates
     with open(
         os.path.join(processed_timeseries_path, "processed_covariates.pkl"), "rb"
     ) as f:
         all_past_covariates_cleaned = pickle.load(f)
+
 except FileNotFoundError:
     print(
         "ERRO: Arquivos de dados processados (processed_targets.pkl ou processed_covariates.pkl) não encontrados. Verifique os caminhos."
@@ -70,10 +70,19 @@ target_ts_scaled = scaler_output.fit_transform(all_targets_cleaned)
 past_covariates_ts_scaled = scaler_covariates.fit_transform(all_past_covariates_cleaned)
 
 # Split Train/Test
-train_ts, test_ts = train_test_split(target_ts_scaled, test_size=0.2, axis=1)
-train_past_covariates_ts, test_past_covariates_ts = train_test_split(
+# train_ts, test_ts = train_test_split(target_ts_scaled, test_size=0.2, axis=1)
+
+# train_past_covariates_ts, test_past_covariates_ts = train_test_split(
+#     past_covariates_ts_scaled, test_size=0.2, axis=1
+# )
+
+
+train_ts, _ = train_test_split(target_ts_scaled, test_size=0.2, axis=1)
+
+train_past_covariates_ts, _ = train_test_split(
     past_covariates_ts_scaled, test_size=0.2, axis=1
 )
+
 
 # Parametros comuns
 predict_horizon = 10
@@ -106,13 +115,14 @@ output_chunk_length = 10
 #     verbose=1,
 # )
 
-# model = LightGBMModel(
-#     lags=10,
-#     lags_past_covariates=10,
-#     output_chunk_length=output_chunk_length,
-#     n_jobs=-1,
-#     verbose=1,
-# )
+model = LightGBMModel(
+    lags=10,
+    lags_past_covariates=10,
+    lags_future_covariates=None,
+    output_chunk_length=output_chunk_length,
+    n_jobs=-1,
+    verbose=1,
+)
 
 # --- Deep Learning Based Models ---
 # Covariates: RSRP, RSRQ, SNR, RSSI, Speed
@@ -126,25 +136,25 @@ output_chunk_length = 10
 #     hidden_fc_sizes=[64,32],
 #     dropout=0.2,
 #     activation="ReLU",
-#     batch_size=64,         
-#     n_epochs=100,                 
+#     batch_size=64,
+#     n_epochs=100,
 #     **get_torch_device_config(),
 # )
 
-model = NBEATSModel(
-    input_chunk_length=input_chunk_length,
-    output_chunk_length=output_chunk_length,
-    generic_architecture=True,
-    num_stacks=30,
-    num_blocks=1,
-    num_layers=4,
-    layer_widths=256,
-    expansion_coefficient_dim=5,
-    dropout=0.2,
-    batch_size=128,         
-    n_epochs=100,                 
-    **get_torch_device_config(),
-)
+# model = NBEATSModel(
+#     input_chunk_length=input_chunk_length,
+#     output_chunk_length=output_chunk_length,
+#     generic_architecture=True,
+#     num_stacks=30,
+#     num_blocks=1,
+#     num_layers=4,
+#     layer_widths=256,
+#     expansion_coefficient_dim=5,
+#     dropout=0.2,
+#     batch_size=128,
+#     n_epochs=100,
+#     **get_torch_device_config(),
+# )
 
 # Treinamento com covariáveis
 model, fit_elapsed_time, model_name = train_time_series_model(
@@ -158,7 +168,7 @@ model, fit_elapsed_time, model_name = train_time_series_model(
 historical_preds_scaled, hf_elapsed_time = walk_forward_validation(
     model=model,
     target_series=target_ts_scaled,
-    covariate_series=train_past_covariates_ts,
+    covariate_series=past_covariates_ts_scaled,
     forecast_horizon=predict_horizon,
 )
 
@@ -173,80 +183,3 @@ save_historical_forecast_results(
     results_path=results_path,
     mode="global_covariate",
 )
-
-
-# # Filtrar séries para as quais não foi possível gerar previsões (se houver Nones)
-# valid_actuals_for_metrics = []
-# valid_preds_for_metrics = []
-# for i in range(len(all_targets_cleaned)):
-#     if i < len(historical_preds_unscaled) and historical_preds_unscaled[i] is not None:
-#         # Verifica se a previsão não está vazia (pode acontecer se a fatia de teste for muito pequena)
-#         if len(historical_preds_unscaled[i]) > 0:
-#                 valid_actuals_for_metrics.append(all_targets_cleaned[i])
-#                 valid_preds_for_metrics.append(historical_preds_unscaled[i])
-#         else:
-#             print(f"INFO: Previsão histórica para série {i} está vazia. Pulando para métricas.")
-#     else:
-#         print(f"INFO: Nenhuma previsão histórica gerada para série {i} ou é None. Pulando para métricas.")
-
-# mae_overall = mae(valid_actuals_for_metrics, valid_preds_for_metrics)
-# rmse_overall = rmse(valid_actuals_for_metrics, valid_preds_for_metrics)
-
-# print(f"  Todos os MAE:  {mae_overall}")
-# print(f"  Todos os RMSE: {rmse_overall}")
-
-# print(f"  MAE Mean:  {np.mean(mae_overall)}")
-# print(f"  RMSE Mean: {np.mean(rmse_overall)}")
-
-# try:
-#     mape_overall = mape(valid_actuals_for_metrics, valid_preds_for_metrics)
-#     print(f"  MAPE Geral: {mape_overall}%")
-# except Exception as e:
-#     print("[Warning] Não foi possivel usar mape.\n", e)
-
-# print("\n--- Gerando Gráficos Comparativos (Real vs. Previsto) com Métricas Individuais ---")
-
-# # Define quantas séries você quer plotar
-# num_series_to_plot = min(len(valid_actuals_for_metrics), 5) # Plota no máximo 5 séries
-
-# if num_series_to_plot == 0:
-#     print("Nenhuma série válida para plotar.")
-# else:
-#     for i in range(num_series_to_plot):
-#         actual_series = valid_actuals_for_metrics[i]
-#         predicted_series = valid_preds_for_metrics[i]
-
-#         # Calcula MAE e RMSE para a série ATUAL
-#         # As funções de métrica do Darts retornam um único valor se as entradas forem TimeSeries únicas
-#         current_mae = mae(actual_series, predicted_series)
-#         current_rmse = rmse(actual_series, predicted_series)
-#         # Tenta calcular MAPE para a série atual, se possível
-#         current_mape_str = ""
-#         try:
-#             current_mape = mape(actual_series, predicted_series)
-#             current_mape_str = f", MAPE: {current_mape:.2f}%"
-#         except Exception: # Captura ZeroDivisionError ou ValueError do Darts
-#             current_mape_str = ", MAPE: N/A"
-
-#         plt.figure(figsize=(14, 7)) # Aumentei um pouco a largura para a legenda
-
-#         actual_series.plot(label='Real (Completa)', lw=1.5)
-
-#         # Adiciona as métricas na legenda da série prevista
-#         predicted_series.plot(
-#             label=f'Previsto (MAE: {current_mae:.2f}, RMSE: {current_rmse:.2f}{current_mape_str})',
-#             lw=1.5,
-#             linestyle='--'
-#         )
-
-#         plt.title(f'Comparação Real vs. Previsto - Série {i+1}')
-#         plt.xlabel('Tempo')
-#         plt.ylabel(target_col_name)
-#         plt.legend(loc='best') # 'best' tenta encontrar a melhor localização para a legenda
-#         plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-#         plt.tight_layout()
-#         plt.show()
-
-#     if len(valid_actuals_for_metrics) > num_series_to_plot:
-#         print(f"\n[INFO] Mostrando gráficos para as primeiras {num_series_to_plot} de {len(valid_actuals_for_metrics)} séries válidas.")
-#         print("[INFO] Para plotar todas ou mais séries, ajuste 'num_series_to_plot' no código.")

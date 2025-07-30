@@ -6,11 +6,12 @@ import pandas as pd
 from darts import TimeSeries
 from darts.models.forecasting.forecasting_model import ForecastingModel
 
+
 def train_time_series_model(
     model: ForecastingModel,
     train_series: List[TimeSeries],
     base_data_path: str,
-    train_covariates: Optional[List[TimeSeries]] = None
+    train_covariates: Optional[List[TimeSeries]] = None,
 ) -> Tuple[ForecastingModel, float, str]:
     """
     Treina um modelo de séries temporais com ou sem covariáveis passadas.
@@ -62,12 +63,11 @@ def train_time_series_model(
 
     return model, fit_elapsed_time, model_name
 
-
 def walk_forward_validation(
     model: ForecastingModel,
     target_series: List[TimeSeries],
     covariate_series: Optional[List[TimeSeries]],
-    forecast_horizon: int
+    forecast_horizon: int,
 ) -> Tuple[List[TimeSeries], float]:
     """
     Realiza a validação walk-forward com forecast histórico (backtesting).
@@ -90,38 +90,55 @@ def walk_forward_validation(
     hf_elapsed_time : float
         Tempo de execução do forecast histórico.
     """
-    model_name = model.__class__.__name__
-    print(f"\n--- Realizando Historical Forecasts para {model_name} ---")
 
+    print(f"\n--- Realizando Historical Forecasts para {model.__class__.__name__} ---")
     start_hf_time = time.time()
 
+    historical_preds_scaled = []
+
+#     if covariate_series is not None:
+#         historical_preds_scaled = model.historical_forecasts(
+#             series=target_series,
+#             past_covariates=covariate_series,
+#             start=0.8,
+#             forecast_horizon=forecast_horizon,
+#             stride=1,
+#             retrain=False,
+#             verbose=True,
+#             show_warnings=True,
+#         )
     if covariate_series is not None:
-        historical_preds_scaled = model.historical_forecasts(
-            series=target_series,
-            past_covariates=covariate_series,
-            start=0.8,
-            forecast_horizon=forecast_horizon,
-            stride=1,
-            retrain=False,
-            verbose=True,
-            show_warnings=True,
-        )
+        for target, cov in zip(target_series, covariate_series):
+            preds = model.historical_forecasts(
+                series=target,
+                past_covariates=cov,
+                start=0.8,
+                forecast_horizon=forecast_horizon,
+                stride=1,
+                retrain=False,
+                verbose=True,
+                show_warnings=True,
+            )
+            historical_preds_scaled.append(preds)
     else:
-        historical_preds_scaled = model.historical_forecasts(
-            series=target_series,
-            start=0.8,
-            forecast_horizon=forecast_horizon,
-            stride=1,
-            retrain=False,
-            verbose=True,
-            show_warnings=True,
-        )
+        for target in target_series:
+            preds = model.historical_forecasts(
+                series=target,
+                start=0.8,
+                forecast_horizon=forecast_horizon,
+                stride=1,
+                retrain=False,
+                verbose=True,
+                show_warnings=True,
+            )
+            historical_preds_scaled.append(preds)
 
     hf_elapsed_time = time.time() - start_hf_time
     print(f"Forecasts concluídos em {hf_elapsed_time:.2f}s")
 
     if not historical_preds_scaled:
-        raise ValueError(f"Nenhuma previsão histórica foi gerada por {model.__class__.__name__}. "
-                     f"Verifique se o modelo é compatível com múltiplas séries e se os parâmetros são válidos.")
+        raise ValueError(
+            f"Nenhuma previsão histórica foi gerada por {model.__class__.__name__}."
+        )
 
     return historical_preds_scaled, hf_elapsed_time

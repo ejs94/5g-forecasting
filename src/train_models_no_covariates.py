@@ -46,6 +46,7 @@ try:
         os.path.join(processed_timeseries_path, "processed_targets.pkl"), "rb"
     ) as f:
         all_targets_cleaned = pickle.load(f)
+
 except FileNotFoundError:
     print("ERRO: Arquivos de dados processados não encontrados. Verifique os caminhos.")
     exit()
@@ -129,13 +130,13 @@ output_chunk_length = 10  # not defined for statistical models
 #     n_jobs=-1, # ativa o uso de todos os threads
 # )
 
-# model = LightGBMModel(
-#     lags=10,
-#     lags_past_covariates=None,
-#     lags_future_covariates=None,
-#     output_chunk_length=output_chunk_length,
-#     n_jobs=-1, # ativa o uso de todos os threads
-# )
+model = LightGBMModel(
+    lags=10,
+    lags_past_covariates=None,
+    lags_future_covariates=None,
+    output_chunk_length=output_chunk_length,
+    n_jobs=-1, # ativa o uso de todos os threads
+)
 
 # Deep Learning based Models
 
@@ -151,20 +152,20 @@ output_chunk_length = 10  # not defined for statistical models
 #     **torch_kwargs,
 # )
 
-model = NBEATSModel(
-    input_chunk_length=input_chunk_length,
-    output_chunk_length=output_chunk_length,
-    generic_architecture=True, 
-    num_stacks=30, 
-    num_blocks=1, 
-    num_layers=4, 
-    layer_widths=256,
-    expansion_coefficient_dim=5,
-    dropout=0.2,
-    batch_size=128,
-    n_epochs=100,
-    **torch_kwargs,
-)
+# model = NBEATSModel(
+#     input_chunk_length=input_chunk_length,
+#     output_chunk_length=output_chunk_length,
+#     generic_architecture=True, 
+#     num_stacks=30, 
+#     num_blocks=1, 
+#     num_layers=4, 
+#     layer_widths=256,
+#     expansion_coefficient_dim=5,
+#     dropout=0.2,
+#     batch_size=128,
+#     n_epochs=100,
+#     **torch_kwargs,
+# )
 
 # Treinamento sem covariáveis
 model, fit_elapsed_time, model_name = train_time_series_model(

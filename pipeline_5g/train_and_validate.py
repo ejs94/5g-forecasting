@@ -2,7 +2,6 @@ import os
 import time
 from typing import List, Optional, Tuple
 
-import pandas as pd
 from darts import TimeSeries
 from darts.models.forecasting.forecasting_model import ForecastingModel
 
@@ -96,42 +95,59 @@ def walk_forward_validation(
 
     historical_preds_scaled = []
 
-#     if covariate_series is not None:
-#         historical_preds_scaled = model.historical_forecasts(
-#             series=target_series,
-#             past_covariates=covariate_series,
-#             start=0.8,
-#             forecast_horizon=forecast_horizon,
-#             stride=1,
-#             retrain=False,
-#             verbose=True,
-#             show_warnings=True,
-#         )
+
+    ## Experimental: Lets check the compatibility from this.
     if covariate_series is not None:
-        for target, cov in zip(target_series, covariate_series):
-            preds = model.historical_forecasts(
-                series=target,
-                past_covariates=cov,
-                start=0.8,
-                forecast_horizon=forecast_horizon,
-                stride=1,
-                retrain=False,
-                verbose=True,
-                show_warnings=True,
-            )
-            historical_preds_scaled.append(preds)
+        print("\n--- Este modelo tem covariadas ---")
+        historical_preds_scaled = model.historical_forecasts(
+            series=target_series,
+            past_covariates=covariate_series,
+            start=0.8,
+            forecast_horizon=forecast_horizon,
+            stride=1,
+            retrain=False,
+            verbose=True,
+            show_warnings=True,
+        )
     else:
-        for target in target_series:
-            preds = model.historical_forecasts(
-                series=target,
-                start=0.8,
-                forecast_horizon=forecast_horizon,
-                stride=1,
-                retrain=False,
-                verbose=True,
-                show_warnings=True,
-            )
-            historical_preds_scaled.append(preds)
+        print("\n--- Este modelo não tem covariadas ---")
+        historical_preds_scaled = model.historical_forecasts(
+            series=target_series,
+            past_covariates=None,
+            start=0.8,
+            forecast_horizon=forecast_horizon,
+            stride=1,
+            retrain=False,
+            verbose=True,
+            show_warnings=True,
+        )
+
+    ## This code is not working with NBEATS
+    # if covariate_series is not None:
+    #     for target, cov in zip(target_series, covariate_series):
+    #         preds = model.historical_forecasts(
+    #             series=target,
+    #             past_covariates=cov,
+    #             start=0.8,
+    #             forecast_horizon=forecast_horizon,
+    #             stride=1,
+    #             retrain=False,
+    #             verbose=True,
+    #             show_warnings=True,
+    #         )
+    #         historical_preds_scaled.append(preds)
+    # else:
+    #     for target in target_series:
+    #         preds = model.historical_forecasts(
+    #             series=target,
+    #             start=0.8,
+    #             forecast_horizon=forecast_horizon,
+    #             stride=1,
+    #             retrain=False,
+    #             verbose=True,
+    #             show_warnings=True,
+    #         )
+    #         historical_preds_scaled.append(preds)
 
     hf_elapsed_time = time.time() - start_hf_time
     print(f"Forecasts concluídos em {hf_elapsed_time:.2f}s")

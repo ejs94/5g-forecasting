@@ -115,14 +115,14 @@ output_chunk_length = 10
 #     verbose=1,
 # )
 
-model = LightGBMModel(
-    lags=10,
-    lags_past_covariates=10,
-    lags_future_covariates=None,
-    output_chunk_length=output_chunk_length,
-    n_jobs=-1,
-    verbose=1,
-)
+# model = LightGBMModel(
+#     lags=10,
+#     lags_past_covariates=10,
+#     lags_future_covariates=None,
+#     output_chunk_length=output_chunk_length,
+#     n_jobs=-1,
+#     verbose=1,
+# )
 
 # --- Deep Learning Based Models ---
 # Covariates: RSRP, RSRQ, SNR, RSSI, Speed
@@ -153,8 +153,17 @@ model = LightGBMModel(
 #     dropout=0.2,
 #     batch_size=128,
 #     n_epochs=100,
-#     **get_torch_device_config(),
+#     **torch_kwargs,
 # )
+
+model = TransformerModel(
+    input_chunk_length=input_chunk_length,
+    output_chunk_length=output_chunk_length,
+    dropout=0.2,
+    # batch_size=128,
+    n_epochs=100,
+    **torch_kwargs,
+)
 
 # Treinamento com covariáveis
 model, fit_elapsed_time, model_name = train_time_series_model(

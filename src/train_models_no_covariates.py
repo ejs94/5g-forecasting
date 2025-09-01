@@ -14,7 +14,7 @@ from darts.models import (
     # PyTorch (Lightning)-based Models
     BlockRNNModel,
     NBEATSModel,
-
+    TransformerModel,
 )
 from darts.utils.model_selection import train_test_split
 from darts.utils.utils import ModelMode, SeasonalityMode
@@ -130,13 +130,13 @@ output_chunk_length = 10  # not defined for statistical models
 #     n_jobs=-1, # ativa o uso de todos os threads
 # )
 
-model = LightGBMModel(
-    lags=10,
-    lags_past_covariates=None,
-    lags_future_covariates=None,
-    output_chunk_length=output_chunk_length,
-    n_jobs=-1, # ativa o uso de todos os threads
-)
+# model = LightGBMModel(
+#     lags=10,
+#     lags_past_covariates=None,
+#     lags_future_covariates=None,
+#     output_chunk_length=output_chunk_length,
+#     n_jobs=-1, # ativa o uso de todos os threads
+# )
 
 # Deep Learning based Models
 
@@ -166,6 +166,15 @@ model = LightGBMModel(
 #     n_epochs=100,
 #     **torch_kwargs,
 # )
+
+model = TransformerModel(
+    input_chunk_length=input_chunk_length,
+    output_chunk_length=output_chunk_length,
+    dropout=0.2,
+    # batch_size=128,
+    n_epochs=100,
+    **torch_kwargs,
+)
 
 # Treinamento sem covariáveis
 model, fit_elapsed_time, model_name = train_time_series_model(

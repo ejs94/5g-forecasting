@@ -191,7 +191,7 @@ def impute_timeseries_missing_values(
                 else:
                     filled = pd.Series(np.nan, index=comp_ts.time_index, name=component_name)
             else:
-                filled = comp_ts.to_series().bfill().ffill()
+                filled = comp_ts.to_series().bfill()
                 if filled.isnull().any() and fill_all_nan_with is not None:
                     filled = filled.fillna(fill_all_nan_with)
 
@@ -212,7 +212,7 @@ def impute_timeseries_missing_values(
             else:
                 ts_imputed = ts_imputed_initial
         else:
-            filled = ts_imputed_initial.to_series().bfill().ffill()
+            filled = ts_imputed_initial.to_series().bfill()
             if filled.isnull().any() and fill_all_nan_with is not None:
                 filled = filled.fillna(fill_all_nan_with)
             ts_imputed = TimeSeries.from_series(filled, freq=ts_imputed_initial.freq_str, fill_missing_dates=True)

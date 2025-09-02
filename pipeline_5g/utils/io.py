@@ -4,9 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
-import shortuuid
 from darts import TimeSeries
 
 
@@ -33,12 +31,12 @@ def extract_5G_dataset(path: Path) -> list[pd.DataFrame]:
 
     files = glob.glob(f"{path}/**/*.csv", recursive=True)
 
-    for file in files:
+    for idx, file in enumerate(files):
         file = os.path.normpath(file)
         df = pd.read_csv(file)
         folder_name, filename = os.path.split(file)
 
-        df["Uid"] = shortuuid.uuid()[:8]
+        df["Uid"] = f"trace_{idx}"
 
         streaming_services = ["Netflix", "Amazon_Prime"]
         if any(service in folder_name for service in streaming_services):

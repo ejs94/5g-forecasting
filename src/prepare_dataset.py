@@ -1,5 +1,4 @@
 import os
-import pickle
 import time
 
 import pandas as pd
@@ -40,15 +39,14 @@ def group_metrics_by_uid(df, freq="s"):
     return df.groupby("Uid").agg({metric: list for metric in metrics}).reset_index()
 
 
-def save_grouped_metrics_to_pickle(df, activity_name, output_dir, freq="s"):
+def save_grouped_metrics_to_parquet(df, activity_name, output_dir, freq="s"):
     """
-    Agrupa métricas por Uid e salva em formato pickle.
+    Agrupa métricas por Uid e salva em formato parquet.
     """
     reduced_df = group_metrics_by_uid(df, freq)
-    pickle_path = os.path.join(output_dir, f"{activity_name}_metrics.pkl")
-    with open(pickle_path, "wb") as f:
-        pickle.dump(reduced_df, f)
-    print(f"Arquivo pickle salvo em: {pickle_path}")
+    parquet_path = os.path.join(output_dir, f"{activity_name}_metrics.parquet")
+    reduced_df.to_parquet(parquet_path)
+    print(f"Arquivo parquet salvo em: {parquet_path}")
 
 
 def process_reduced_metrics(
@@ -58,29 +56,29 @@ def process_reduced_metrics(
     Processa e salva os datasets reduzidos.
     """
     os.makedirs(output_dir, exist_ok=True)
-    save_grouped_metrics_to_pickle(list_static_strm, "static_strm", output_dir)
-    save_grouped_metrics_to_pickle(list_driving_strm, "driving_strm", output_dir)
-    save_grouped_metrics_to_pickle(list_static_down, "static_down", output_dir)
-    save_grouped_metrics_to_pickle(list_driving_down, "driving_down", output_dir)
+    save_grouped_metrics_to_parquet(list_static_strm, "static_strm", output_dir)
+    save_grouped_metrics_to_parquet(list_driving_strm, "driving_strm", output_dir)
+    save_grouped_metrics_to_parquet(list_static_down, "static_down", output_dir)
+    save_grouped_metrics_to_parquet(list_driving_down, "driving_down", output_dir)
 
 
 def build_imputed_timeseries():
     """
     Carrega datasets reduzidos, concatena, converte para séries temporais,
-    imputa valores ausentes e salva os resultados como arquivos .pkl.
+    imputa valores ausentes e salva os resultados como arquivos .parquet.
     """
     data_dir = os.path.join(os.curdir, "data", "reduced_metrics_datasets")
     output_dir = os.path.join(os.curdir, "data", "processed_timeseries")
     os.makedirs(output_dir, exist_ok=True)
 
     file_names = {
-        "static_down": "static_down_metrics.pkl",
-        "static_strm": "static_strm_metrics.pkl",
-        "driving_down": "driving_down_metrics.pkl",
-        "driving_strm": "driving_strm_metrics.pkl",
+        "static_down": "static_down_metrics.parquet",
+        "static_strm": "static_strm_metrics.parquet",
+        "driving_down": "driving_down_metrics.parquet",
+        "driving_strm": "driving_strm_metrics.parquet",
     }
 
-    # Carregamento dos arquivos .pkl
+    # Carregamento dos arquivos .parquet
     print("[INFO] Lendo arquivos de métricas reduzidas...")
     dfs = []
     for label, filename in file_names.items():
@@ -89,10 +87,9 @@ def build_imputed_timeseries():
         if not os.path.exists(path):
             raise FileNotFoundError(f"Arquivo não encontrado: {path}")
         try:
-            with open(path, "rb") as f:
-                df = pickle.load(f)
-                df["source"] = label
-                dfs.append(df)
+            df = pd.read_parquet(path)
+            df["source"] = label
+            dfs.append(df)
         except Exception as e:
             raise RuntimeError(f"Erro ao carregar '{filename}': {e}")
 
@@ -133,15 +130,16 @@ def build_imputed_timeseries():
     print(f"[INFO] Séries temporais processadas com sucesso: {len(targets)}")
 
     # Salvando resultados
-    targets_path = os.path.join(output_dir, "processed_targets.pkl")
-    covariates_path = os.path.join(output_dir, "processed_covariates.pkl")
+    targets_df = pd.DataFrame(targets)
+    covariates_df = pd.DataFrame(covariates_ts)
 
-    with open(targets_path, "wb") as f:
-        pickle.dump(targets, f)
+    targets_path = os.path.join(output_dir, "processed_targets.parquet")
+    covariates_path = os.path.join(output_dir, "processed_covariates.parquet")
+
+    targets_df.to_parquet(targets_path)
     print(f"[INFO] Targets salvos em: {targets_path}")
 
-    with open(covariates_path, "wb") as f:
-        pickle.dump(covariates_ts, f)
+    covariates_df.to_parquet(covariates_path)
     print(f"[INFO] Covariáveis salvas em: {covariates_path}")
 
 

@@ -19,14 +19,35 @@ def save_dataframe_to_parquet(df, path):
     df.to_parquet(path, compression="gzip")
     print(f"Dados salvos em: {path}")
 
+def group_metrics_by_uid(df: pd.DataFrame, freq="s") -> pd.DataFrame:
+    """
+    Agrupa métricas por Uid e ajusta a frequência temporal,
+    focando apenas em Uids que começam com 'trace_'.
 
-def group_metrics_by_uid(df, freq="s"):
+    Args:
+        df (pd.DataFrame): O DataFrame de entrada com colunas como 'Timestamp', 'Uid', e métricas.
+                          O DataFrame deve ter 'Timestamp' como índice, ou ser capaz de ser convertido.
+        freq (str): Frequência de reamostragem (ex: 's' para segundos, '1min' para 1 minuto).
+
+    Returns:
+        pd.DataFrame: Um DataFrame agrupado por Uid, com métricas como listas.
     """
-    Agrupa métricas por Uid e ajusta a frequência temporal.
-    """
-    df = df.asfreq(freq=freq).reset_index()
+    # Certifica-se de que o Timestamp é o índice para usar asfreq
+    if not isinstance(df.index, pd.DatetimeIndex):
+        if 'Timestamp' in df.columns:
+            df['Timestamp'] = pd.to_datetime(df['Timestamp'])
+            df = df.set_index('Timestamp')
+        else:
+            raise ValueError("O DataFrame deve ter um índice DatetimeIndex ou uma coluna 'Timestamp'.")
+
+    # Filtra os Uids que começam com 'trace_'
+    df_filtered_uids = df[df['Uid'].astype(str).str.startswith('trace_')]
+
+    # Aplica asfreq e reseta o índice (agora o Timestamp será uma coluna novamente)
+    df_resampled = df_filtered_uids.asfreq(freq=freq).reset_index()
+
     metrics = [
-        "Timestamp",
+        "Timestamp", # Inclua o Timestamp aqui se quiser ele como uma lista de tempos
         "RSRP",
         "RSRQ",
         "SNR",
@@ -36,7 +57,18 @@ def group_metrics_by_uid(df, freq="s"):
         "UL_bitrate",
         "Speed",
     ]
-    return df.groupby("Uid").agg({metric: list for metric in metrics}).reset_index()
+
+    # Garante que apenas as métricas existentes no DataFrame sejam usadas
+    available_metrics = [m for m in metrics if m in df_resampled.columns]
+
+    # Agrupa por Uid e agrega as métricas como listas
+    grouped_df = df_resampled.groupby("Uid").agg({metric: list for metric in available_metrics}).reset_index()
+
+    # Ordena o DataFrame pelo número extraído de 'Uid'
+    grouped_df['sort_key'] = grouped_df['Uid'].str.extract('(\d+)').astype(int)
+    grouped_df = grouped_df.sort_values(by='sort_key').drop(columns=['sort_key']).reset_index(drop=True)
+
+    return grouped_df
 
 
 def save_grouped_metrics_to_parquet(df, activity_name, output_dir, freq="s"):
@@ -99,49 +131,119 @@ def build_imputed_timeseries():
         )
 
     # Concatenação dos dados
+    output_df_total_path = os.path.join(output_dir, "df_total.parquet")
     df_total = pd.concat(dfs, ignore_index=True)
+    df_total.to_parquet(output_df_total_path)
     print(f"[INFO] Total de amostras após concatenação: {len(df_total)}")
     
-    # Definições
-    target_col = "DL_bitrate"
+    # # Definições
+    # target_col = ["DL_bitrate"]
+    # covariates = ["RSRP", "RSRQ", "SNR", "CQI", "RSSI", "Speed"]
+
+    # traces_uid = []
+    # targets_idx = []
+    # targets_values = []
+    # covariates_idx = []
+    # covariates_values = []
+    # print("[INFO] Gerando séries temporais...")
+    # for idx, row in df_total.iterrows():
+    #     try:
+    #         # Recriar o DataFrame a partir das listas na linha
+    #         ts_df_data = {col: row[col] for col in row.index if col not in ['Uid', 'source']}
+          
+    #         ts_df = pd.DataFrame(ts_df_data)
+
+    #         target_ts = create_target_timeseries(
+    #             ts_df, target_col, timestamp_col="Timestamp"
+    #         )
+    #         cov_ts = create_covariates_timeseries(
+    #             ts_df, covariates, timestamp_col="Timestamp"
+    #         )
+
+    #         print(f"[INFO] Imputando valores ausentes em {row['Uid']}")
+
+    #         target_ts = impute_timeseries_missing_values(target_ts)
+    #         cov_ts = impute_timeseries_missing_values(cov_ts)
+
+    #         traces_uid.append(row["Uid"])
+    #         targets_idx.append(target_ts.time_index)
+    #         targets_values.append(target_ts.values())
+    #         covariates_idx.append(cov_ts.time_index)
+    #         covariates_values.append(cov_ts.values())
+    #     except Exception as e:
+    #         print(f"[WARNING] Erro na linha {idx}: {e}")
+    #         continue
+
+    # print(f"[INFO] Séries temporais processadas com sucesso: {len(traces_uid)}")
+
+    # # Salvando resultados
+
+    # targets_df = pd.DataFrame({
+    # "Uid": traces_uid,
+    # "Targets_time_index": targets_idx,
+    # "Targets": targets_values,
+    # "Covariates_time_index": covariates_idx,
+    # "Covariates": covariates_values
+    # })
+
+    # targets_df_path = os.path.join(output_dir, "processed_targets.parquet")
+    # targets_df.to_parquet(targets_df_path)
+    # print(f"[INFO] Targets salvos em: {targets_df_path}")
+
+    target_col = ["DL_bitrate"]
     covariates = ["RSRP", "RSRQ", "SNR", "CQI", "RSSI", "Speed"]
 
-    targets, covariates_ts = [], []
+    normalized_traces = []  # iremos acumular dataframes já normalizados por Uid/Timestamp
 
-    print("[INFO] Gerando séries temporais e imputando valores ausentes...")
+    print("[INFO] Gerando séries temporais...")
     for idx, row in df_total.iterrows():
         try:
-            target_ts = create_target_timeseries(
-                row, target_col, timestamp_col="Timestamp"
-            )
-            cov_ts = create_covariates_timeseries(
-                row, covariates, timestamp_col="Timestamp"
-            )
+            # Recriar o DataFrame a partir das listas na linha
+            ts_df_data = {col: row[col] for col in row.index if col not in ['Uid', 'source']}
+            ts_df = pd.DataFrame(ts_df_data)
 
+            # Cria séries de alvo e covariáveis (Darts TimeSeries, presumivelmente)
+            target_ts = create_target_timeseries(ts_df, target_col, timestamp_col="Timestamp")
+            cov_ts    = create_covariates_timeseries(ts_df, covariates, timestamp_col="Timestamp")
+
+            print(f"[INFO] Imputando valores ausentes em {row['Uid']}")
             target_ts = impute_timeseries_missing_values(target_ts)
-            cov_ts = impute_timeseries_missing_values(cov_ts)
+            cov_ts    = impute_timeseries_missing_values(cov_ts)
 
-            targets.append(target_ts)
-            covariates_ts.append(cov_ts)
+            # Converte para DataFrame do pandas
+            # Darts fornece .pd_dataframe() com o time_index como index
+            target_df = target_ts.pd_dataframe()      # colunas = target_col
+            cov_df    = cov_ts.pd_dataframe()         # colunas = covariates
+
+            df_join = target_df.join(cov_df, how="outer")
+
+            # Garante nome do índice como 'Timestamp' e reseta para coluna
+            df_join.index.name = "Timestamp"
+            df_join = df_join.reset_index()
+
+            # Anexa Uid
+            df_join.insert(0, "Uid", row["Uid"])
+
+            # (opcional) ordena temporalmente
+            df_join = df_join.sort_values(["Uid", "Timestamp"])
+
+            normalized_traces.append(df_join)
+
         except Exception as e:
             print(f"[WARNING] Erro na linha {idx}: {e}")
             continue
 
-    print(f"[INFO] Séries temporais processadas com sucesso: {len(targets)}")
+    print(f"[INFO] Séries temporais processadas com sucesso: {len(normalized_traces)}")
 
-    # Salvando resultados
-    targets_df = pd.DataFrame(targets)
-    covariates_df = pd.DataFrame(covariates_ts)
+    # Salvando resultados em formato longo (1 linha por Uid-Timestamp)
+    final_df = pd.concat(normalized_traces, ignore_index=True)
 
-    targets_path = os.path.join(output_dir, "processed_targets.parquet")
-    covariates_path = os.path.join(output_dir, "processed_covariates.parquet")
-
-    targets_df.to_parquet(targets_path)
-    print(f"[INFO] Targets salvos em: {targets_path}")
-
-    covariates_df.to_parquet(covariates_path)
-    print(f"[INFO] Covariáveis salvas em: {covariates_path}")
-
+    # Garante dtypes adequados
+    final_df["Timestamp"] = pd.to_datetime(final_df["Timestamp"], utc=False)
+    # Salva em Parquet; particionar por Uid ajuda a ler por traço e reduz I/O
+    output_path = os.path.join(output_dir,"processed_timeseries.parquet")
+    final_df.to_parquet(output_path, engine="pyarrow")  # usar partition_cols=['Uid'] para múltiplos arquivos
+    print(f"[INFO] Targets salvos em: {output_path}")
 
 def main():
     """

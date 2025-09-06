@@ -96,7 +96,8 @@ def save_historical_forecast_results(
     fit_elapsed_time: float,
     hf_elapsed_time: float,
     results_path: str,
-    mode: str = ""
+    mode: str = "",
+    series_ids: list[str] | None = None
 ) -> str:
     """
     Salva os resultados das previsões históricas em formato Parquet.
@@ -121,7 +122,7 @@ def save_historical_forecast_results(
 
         results_rows.append({
             "Model": model_name,
-            "Series_id": i,
+            "Series_id": series_ids[i] if series_ids is not None else i,
             "Fit_elapsed_time": fit_elapsed_time,
             "Historical_Forecast_elapsed_time": hf_elapsed_time,
             "Actuals_index": actuals_aligned.time_index.astype(str).tolist(),

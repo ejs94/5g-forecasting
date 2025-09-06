@@ -1,6 +1,8 @@
 import os
-import pickle
 import warnings
+
+import pandas as pd
+from darts import TimeSeries
 
 from darts.dataprocessing.transformers import Scaler
 from darts.models import (
@@ -43,30 +45,68 @@ os.makedirs(results_path, exist_ok=True)
 models_trained_path = os.path.join(base_data_path, "results", "models_trained")
 os.makedirs(models_trained_path, exist_ok=True)
 
-try:
-    # Load target
-    with open(
-        os.path.join(processed_timeseries_path, "processed_targets.pkl"), "rb"
-    ) as f:
-        all_targets_cleaned = pickle.load(f)
+# Leitura do dataset longo
+parquet_path = os.path.join(processed_timeseries_path, "processed_timeseries.parquet")
+if not os.path.exists(parquet_path):
+    print(f"ERRO: Arquivo não encontrado: {parquet_path}")
+    exit(1)
 
-    # Load covariates
-    with open(
-        os.path.join(processed_timeseries_path, "processed_covariates.pkl"), "rb"
-    ) as f:
-        all_past_covariates_cleaned = pickle.load(f)
 
-except FileNotFoundError:
-    print(
-        "ERRO: Arquivos de dados processados (processed_targets.pkl ou processed_covariates.pkl) não encontrados. Verifique os caminhos."
-    )
-    exit()
+df_long = pd.read_parquet(parquet_path)
+
+# Garante dtypes e ordenação
+df_long["Timestamp"] = pd.to_datetime(df_long["Timestamp"], utc=False)
+df_long = df_long.sort_values(["Uid", "Timestamp"])
+
+target_col = "DL_bitrate"
+cov_cols = [c for c in ["RSRP", "RSRQ", "SNR", "CQI", "RSSI", "Speed"] if c in df_long.columns]
+
+all_targets_cleaned = []
+all_past_covariates_cleaned = []
+all_uids = []
+
+for uid, g in df_long.groupby("Uid", sort=True):
+    # mantém apenas linhas com alvo disponível
+    g_t = g.dropna(subset=[target_col]).copy()
+    if g_t.empty:
+        continue
+
+    # cria séries Darts
+    tgt_ts = TimeSeries.from_dataframe(g_t, time_col="Timestamp", value_cols=[target_col])
+
+    if cov_cols:
+        g_c = g.dropna(subset=cov_cols).copy()
+        if g_c.empty:
+            # sem covariadas válidas: pode pular ou criar uma série vazia
+            continue
+        cov_ts = TimeSeries.from_dataframe(g_c, time_col="Timestamp", value_cols=cov_cols)
+
+        # alinha por interseção de índices (importante para Darts)
+        tgt_ts = tgt_ts.slice_intersect(cov_ts)
+        cov_ts = cov_ts.slice_intersect(tgt_ts)
+
+        # filtra casos degenerados
+        if len(tgt_ts) == 0 or len(cov_ts) == 0:
+            continue
+
+        all_targets_cleaned.append(tgt_ts)
+        all_past_covariates_cleaned.append(cov_ts)
+        all_uids.append(uid)
+    else:
+        # Sem covariadas no dataset; ainda adiciona targets
+        if len(tgt_ts) > 0:
+            all_targets_cleaned.append(tgt_ts)
+
+if not all_targets_cleaned:
+    print("ERRO: Não foi possível construir séries alvo a partir do parquet.")
+    exit(1)
 
 ## MinMaxScaler
 scaler_output = Scaler()
 scaler_covariates = Scaler()
 
 target_ts_scaled = scaler_output.fit_transform(all_targets_cleaned)
+
 past_covariates_ts_scaled = scaler_covariates.fit_transform(all_past_covariates_cleaned)
 
 # Split Train/Test
@@ -76,13 +116,11 @@ past_covariates_ts_scaled = scaler_covariates.fit_transform(all_past_covariates_
 #     past_covariates_ts_scaled, test_size=0.2, axis=1
 # )
 
-
 train_ts, _ = train_test_split(target_ts_scaled, test_size=0.2, axis=1)
 
 train_past_covariates_ts, _ = train_test_split(
     past_covariates_ts_scaled, test_size=0.2, axis=1
 )
-
 
 # Parametros comuns
 predict_horizon = 10
@@ -99,11 +137,11 @@ output_chunk_length = 10
 # --- Linear Regression ---
 # Covariates: RSRP, RSRQ, SNR, RSSI, Speed
 
-# model = LinearRegressionModel(
-#     lags=10,
-#     lags_past_covariates=10,
-#     output_chunk_length=output_chunk_length
-# )
+model = LinearRegressionModel(
+    lags=10,
+    lags_past_covariates=10,
+    output_chunk_length=output_chunk_length
+)
 
 # model = RandomForest(
 #     lags=10,
@@ -156,14 +194,14 @@ output_chunk_length = 10
 #     **torch_kwargs,
 # )
 
-model = TransformerModel(
-    input_chunk_length=input_chunk_length,
-    output_chunk_length=output_chunk_length,
-    dropout=0.2,
-    # batch_size=128,
-    n_epochs=100,
-    **torch_kwargs,
-)
+# model = TransformerModel(
+#     input_chunk_length=input_chunk_length,
+#     output_chunk_length=output_chunk_length,
+#     dropout=0.2,
+#     # batch_size=128,
+#     n_epochs=100,
+#     **torch_kwargs,
+# )
 
 # Treinamento com covariáveis
 model, fit_elapsed_time, model_name = train_time_series_model(
@@ -191,4 +229,5 @@ save_historical_forecast_results(
     hf_elapsed_time=hf_elapsed_time,
     results_path=results_path,
     mode="global_covariate",
+    series_ids=all_uids,
 )

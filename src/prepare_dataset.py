@@ -11,7 +11,6 @@ from pipeline_5g.utils import (
     preprocess_5G_dataframe,
 )
 
-
 def save_dataframe_to_parquet(df, path):
     """
     Salva um DataFrame no formato Parquet com compressão gzip.
@@ -65,7 +64,7 @@ def group_metrics_by_uid(df: pd.DataFrame, freq="s") -> pd.DataFrame:
     grouped_df = df_resampled.groupby("Uid").agg({metric: list for metric in available_metrics}).reset_index()
 
     # Ordena o DataFrame pelo número extraído de 'Uid'
-    grouped_df['sort_key'] = grouped_df['Uid'].str.extract('(\d+)').astype(int)
+    grouped_df['sort_key'] = grouped_df['Uid'].str.extract(r'(\d+)').astype(int)
     grouped_df = grouped_df.sort_values(by='sort_key').drop(columns=['sort_key']).reset_index(drop=True)
 
     return grouped_df
@@ -135,60 +134,6 @@ def build_imputed_timeseries():
     df_total = pd.concat(dfs, ignore_index=True)
     df_total.to_parquet(output_df_total_path)
     print(f"[INFO] Total de amostras após concatenação: {len(df_total)}")
-    
-    # # Definições
-    # target_col = ["DL_bitrate"]
-    # covariates = ["RSRP", "RSRQ", "SNR", "CQI", "RSSI", "Speed"]
-
-    # traces_uid = []
-    # targets_idx = []
-    # targets_values = []
-    # covariates_idx = []
-    # covariates_values = []
-    # print("[INFO] Gerando séries temporais...")
-    # for idx, row in df_total.iterrows():
-    #     try:
-    #         # Recriar o DataFrame a partir das listas na linha
-    #         ts_df_data = {col: row[col] for col in row.index if col not in ['Uid', 'source']}
-          
-    #         ts_df = pd.DataFrame(ts_df_data)
-
-    #         target_ts = create_target_timeseries(
-    #             ts_df, target_col, timestamp_col="Timestamp"
-    #         )
-    #         cov_ts = create_covariates_timeseries(
-    #             ts_df, covariates, timestamp_col="Timestamp"
-    #         )
-
-    #         print(f"[INFO] Imputando valores ausentes em {row['Uid']}")
-
-    #         target_ts = impute_timeseries_missing_values(target_ts)
-    #         cov_ts = impute_timeseries_missing_values(cov_ts)
-
-    #         traces_uid.append(row["Uid"])
-    #         targets_idx.append(target_ts.time_index)
-    #         targets_values.append(target_ts.values())
-    #         covariates_idx.append(cov_ts.time_index)
-    #         covariates_values.append(cov_ts.values())
-    #     except Exception as e:
-    #         print(f"[WARNING] Erro na linha {idx}: {e}")
-    #         continue
-
-    # print(f"[INFO] Séries temporais processadas com sucesso: {len(traces_uid)}")
-
-    # # Salvando resultados
-
-    # targets_df = pd.DataFrame({
-    # "Uid": traces_uid,
-    # "Targets_time_index": targets_idx,
-    # "Targets": targets_values,
-    # "Covariates_time_index": covariates_idx,
-    # "Covariates": covariates_values
-    # })
-
-    # targets_df_path = os.path.join(output_dir, "processed_targets.parquet")
-    # targets_df.to_parquet(targets_df_path)
-    # print(f"[INFO] Targets salvos em: {targets_df_path}")
 
     target_col = ["DL_bitrate"]
     covariates = ["RSRP", "RSRQ", "SNR", "CQI", "RSSI", "Speed"]
@@ -211,9 +156,9 @@ def build_imputed_timeseries():
             cov_ts    = impute_timeseries_missing_values(cov_ts)
 
             # Converte para DataFrame do pandas
-            # Darts fornece .pd_dataframe() com o time_index como index
-            target_df = target_ts.pd_dataframe()      # colunas = target_col
-            cov_df    = cov_ts.pd_dataframe()         # colunas = covariates
+            # Darts fornece .to_dataframe() com o time_index como index
+            target_df = target_ts.to_dataframe()      # colunas = target_col
+            cov_df    = cov_ts.to_dataframe()         # colunas = covariates
 
             df_join = target_df.join(cov_df, how="outer")
 
@@ -255,7 +200,6 @@ def main():
     reduced_output_dir = os.path.join(data_path, "reduced_metrics_datasets")
 
     # config = load_or_create_config(config_path)
-
     print("--- Extraindo e Preprocessando o 5G Dataset ---")
     
     df_static, df_driving = extract_5G_dataset(original_path)

@@ -143,65 +143,71 @@ model = LinearRegressionModel(
     output_chunk_length=output_chunk_length
 )
 
-# model = RandomForest(
-#     lags=10,
-#     lags_past_covariates=10,
-#     output_chunk_length=output_chunk_length,
-#     n_estimators=200,
-#     max_depth=15,
-#     n_jobs=-1,
-#     verbose=1,
-# )
+model = RandomForest(
+    lags=10,
+    lags_past_covariates=10,
+    output_chunk_length=output_chunk_length,
+    # n_estimators=200,
+    # max_depth=12,
+    # min_samples_leaf=2,
+    n_jobs=-1,
+    random_state=42,
+    verbose=1,
+)
 
-# model = LightGBMModel(
-#     lags=10,
-#     lags_past_covariates=10,
-#     lags_future_covariates=None,
-#     output_chunk_length=output_chunk_length,
-#     n_jobs=-1,
-#     verbose=1,
-# )
+model = LightGBMModel(
+    lags=10,
+    lags_past_covariates=10,
+    lags_future_covariates=None,
+    output_chunk_length=output_chunk_length,
+    n_jobs=-1,
+    random_state=42,
+    verbose=1,
+)
 
 # --- Deep Learning Based Models ---
 # Covariates: RSRP, RSRQ, SNR, RSSI, Speed
 
-# model = BlockRNNModel(
-#     input_chunk_length=input_chunk_length,
-#     output_chunk_length=output_chunk_length,
-#     model="LSTM",
-#     hidden_dim=64,
-#     n_rnn_layers=2,
-#     hidden_fc_sizes=[64,32],
-#     dropout=0.2,
-#     activation="ReLU",
-#     batch_size=64,
-#     n_epochs=100,
-#     **get_torch_device_config(),
-# )
+model = BlockRNNModel(
+    input_chunk_length=input_chunk_length,
+    output_chunk_length=output_chunk_length,
+    # model="LSTM",
+    # hidden_dim=64,
+    # n_rnn_layers=2,
+    # hidden_fc_sizes=[64,32],
+    # dropout=0.2,
+    # activation="ReLU",
+    batch_size=32,
+    n_epochs=100,
+    random_state=42,
+    **get_torch_device_config(),
+)
 
-# model = NBEATSModel(
-#     input_chunk_length=input_chunk_length,
-#     output_chunk_length=output_chunk_length,
-#     generic_architecture=True,
-#     num_stacks=30,
-#     num_blocks=1,
-#     num_layers=4,
-#     layer_widths=256,
-#     expansion_coefficient_dim=5,
-#     dropout=0.2,
-#     batch_size=128,
-#     n_epochs=100,
-#     **torch_kwargs,
-# )
+model = NBEATSModel(
+    input_chunk_length=input_chunk_length,
+    output_chunk_length=output_chunk_length,
+    # generic_architecture=True,
+    # num_stacks=30,
+    # num_blocks=1,
+    # num_layers=4,
+    # layer_widths=256,
+    # expansion_coefficient_dim=5,
+    # dropout=0.2,
+    batch_size=32,
+    n_epochs=100,
+    random_state=42,
+    **torch_kwargs,
+)
 
-# model = TransformerModel(
-#     input_chunk_length=input_chunk_length,
-#     output_chunk_length=output_chunk_length,
-#     dropout=0.2,
-#     # batch_size=128,
-#     n_epochs=100,
-#     **torch_kwargs,
-# )
+model = TransformerModel(
+    input_chunk_length=input_chunk_length,
+    output_chunk_length=output_chunk_length,
+    # dropout=0.2,
+    batch_size=32,
+    n_epochs=100,
+    random_state=42,
+    **torch_kwargs,
+)
 
 # Treinamento com covariáveis
 model, fit_elapsed_time, model_name = train_time_series_model(

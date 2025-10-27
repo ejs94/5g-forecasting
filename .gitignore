@@ -163,3 +163,4 @@ cython_debug/
 # Data Results
 /data/*
 /download-data
+.vscode
